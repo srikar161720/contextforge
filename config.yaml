@@ -1,0 +1,48 @@
+model:
+  id: "us.amazon.nova-2-lite-v1:0"  # US CRIS profile — required for Web Grounding
+  region: "us-east-1"
+
+pricing:                # Per 1M tokens, US CRIS profile
+  input: 0.30           # $0.30 / 1M input tokens
+  output: 2.50          # $2.50 / 1M output tokens (includes reasoning tokens)
+
+rate_limits:            # Confirmed via AWS Service Quotas for us.amazon.nova-2-lite-v1:0
+  rpm: 200              # Requests per minute
+  tpm: 8000000          # Tokens per minute
+
+modes:
+  demo:
+    num_queries: 3
+    reasoning_tiers: ["disabled", "medium"]
+    repetitions: 1
+    run_multi_section: false
+    run_ordering: false
+  quick:
+    num_queries: 5
+    reasoning_tiers: ["disabled", "low", "high"]
+    repetitions: 1
+    run_multi_section: true
+    run_ordering: false
+  full:
+    num_queries: 10
+    reasoning_tiers: ["disabled", "low", "medium", "high"]
+    repetitions: 3
+    run_multi_section: true
+    run_ordering: true
+
+thresholds:
+  quality_tolerance: 0.05     # 5% max acceptable quality loss for recommendations
+  redundancy_cosine: 0.7      # TF-IDF cosine similarity threshold for redundancy detection
+  section_impact_low: 0.5     # Below this avg delta → "removable" candidate
+  section_impact_high: 2.0    # Above this avg delta → "essential"
+
+scoring:
+  default_criteria: ["relevance", "accuracy", "completeness", "groundedness"]
+  scoring_reasoning_tier: "medium"
+  scoring_temperature: 0
+
+stretch_goals:
+  nova_embeddings: false
+  web_grounding: false
+  embeddings_model_id: "amazon.nova-2-multimodal-embeddings-v1:0"
+  embeddings_dimensions: 1024
