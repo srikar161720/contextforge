@@ -14,12 +14,18 @@ See context/api-reference.md and context/implementation-patterns.md for the
 reference implementation and API call shape.
 """
 
+from __future__ import annotations
+
 import logging
 import time
 from pathlib import Path
 
 import boto3
 import yaml
+from dotenv import load_dotenv
+
+# Load .env from project root so boto3 picks up AWS credentials automatically
+load_dotenv(Path(__file__).parent.parent / ".env")
 from botocore.config import Config
 from botocore.exceptions import ClientError
 

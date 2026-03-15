@@ -104,6 +104,65 @@ class SectionImpact(BaseModel):
     quality_per_token: float       # avg_quality_delta / token_count — efficiency metric
 
 
+# ── Demo Payload Generation — Batch Response Models ────────────────────────────
+# These are used exclusively by scripts/generate_demo_payload.py with parse_llm_json().
+# Must live here per project rule: all Pydantic models in core/models.py.
+
+class FaqEntry(BaseModel):
+    question: str
+    answer: str
+    topic: str
+
+
+class FaqBatchResponse(BaseModel):
+    faqs: list[FaqEntry]
+
+
+class ProductEntry(BaseModel):
+    sku: str
+    name: str
+    status: str         # "active" | "discontinued"
+    description: str
+    pricing: str
+    features: list[str]
+    limitations: list[str]
+
+
+class CatalogBatchResponse(BaseModel):
+    products: list[ProductEntry]
+
+
+class ConvTurn(BaseModel):
+    turn_number: int
+    role: str           # "customer" | "agent"
+    content: str
+
+
+class ConvResponse(BaseModel):
+    turns: list[ConvTurn]
+
+
+class FewShotEntry(BaseModel):
+    scenario_type: str
+    customer_message: str
+    ideal_response: str
+
+
+class FewShotResponse(BaseModel):
+    examples: list[FewShotEntry]
+
+
+class LegalDocument(BaseModel):
+    title: str
+    content: str
+
+
+class LegalResponse(BaseModel):
+    documents: list[LegalDocument]
+
+
+# ── Ablation Result Models ──────────────────────────────────────────────────────
+
 class AblationResults(BaseModel):
     baseline_scores: dict                  # {tier_name: {query_idx: ScoringResult}}
     section_impacts: list[SectionImpact]
