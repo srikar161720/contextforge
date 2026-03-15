@@ -1,0 +1,38 @@
+[
+  {
+    "timestamp": "2026-03-15T02:39:15.562539+00:00",
+    "script": "generate_demo_payload.py",
+    "mode": "offline",
+    "api_calls": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "cost_usd": 0.0
+  },
+  {
+    "timestamp": "2026-03-15T02:50:46.280904+00:00",
+    "script": "generate_demo_payload.py",
+    "mode": "offline",
+    "api_calls": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "cost_usd": 0.0
+  },
+  {
+    "timestamp": "2026-03-15T03:15:18.939215+00:00",
+    "script": "generate_demo_payload.py",
+    "mode": "offline",
+    "api_calls": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "cost_usd": 0.0
+  },
+  {
+    "timestamp": "2026-03-15T03:34:16.796205+00:00",
+    "script": "generate_demo_payload.py",
+    "mode": "online",
+    "api_calls": 13,
+    "input_tokens": 5406,
+    "output_tokens": 154927,
+    "cost_usd": 0.3889393
+  }
+]
