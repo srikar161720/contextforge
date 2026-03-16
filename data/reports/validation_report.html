@@ -1,0 +1,1413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ContextForge — Ablation Report</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <style>
+    /* ── Reset & Base ────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                   "Helvetica Neue", Arial, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      line-height: 1.6;
+    }
+
+    /* ── Layout ──────────────────────────────────────────────────────────── */
+    .page-wrapper {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    /* ── Header ──────────────────────────────────────────────────────────── */
+    .report-header {
+      border-bottom: 2px solid #4a5568;
+      padding-bottom: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .report-header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #f7fafc;
+      letter-spacing: -0.5px;
+    }
+    .report-header .subtitle {
+      color: #a0aec0;
+      font-size: 0.9rem;
+      margin-top: 0.25rem;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-left: 0.5rem;
+      vertical-align: middle;
+    }
+    .badge-demo  { background: #2d3748; color: #63b3ed; border: 1px solid #4299e1; }
+    .badge-quick { background: #2d3748; color: #68d391; border: 1px solid #48bb78; }
+    .badge-full  { background: #2d3748; color: #f6ad55; border: 1px solid #ed8936; }
+
+    /* ── Section headings ────────────────────────────────────────────────── */
+    .section {
+      margin-bottom: 3rem;
+    }
+    .section-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #90cdf4;
+      border-left: 4px solid #4299e1;
+      padding-left: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    /* ── Summary cards ───────────────────────────────────────────────────── */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .summary-card {
+      background: #1a202c;
+      border: 1px solid #2d3748;
+      border-radius: 0.5rem;
+      padding: 1rem 1.25rem;
+    }
+    .summary-card .card-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #718096;
+      margin-bottom: 0.3rem;
+    }
+    .summary-card .card-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #f7fafc;
+    }
+    .summary-card .card-sub {
+      font-size: 0.8rem;
+      color: #a0aec0;
+      margin-top: 0.15rem;
+    }
+    .card-positive { border-top: 3px solid #48bb78; }
+    .card-neutral  { border-top: 3px solid #4299e1; }
+    .card-warning  { border-top: 3px solid #ed8936; }
+
+    /* ── Chart containers ────────────────────────────────────────────────── */
+    .chart-container {
+      background: #1a202c;
+      border: 1px solid #2d3748;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+      overflow: hidden;
+    }
+    .chart-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      margin-bottom: 0.75rem;
+    }
+    .chart-description {
+      font-size: 0.8rem;
+      color: #718096;
+      margin-bottom: 0.75rem;
+    }
+
+    /* ── Tables ──────────────────────────────────────────────────────────── */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    .data-table th {
+      background: #2d3748;
+      color: #a0aec0;
+      font-weight: 600;
+      text-align: left;
+      padding: 0.6rem 0.75rem;
+      border-bottom: 2px solid #4a5568;
+      white-space: nowrap;
+    }
+    .data-table td {
+      padding: 0.55rem 0.75rem;
+      border-bottom: 1px solid #2d3748;
+      color: #e2e8f0;
+    }
+    .data-table tr:hover td { background: #1e2535; }
+    .classification-essential { color: #f6ad55; font-weight: 600; }
+    .classification-moderate  { color: #63b3ed; font-weight: 600; }
+    .classification-removable { color: #68d391; font-weight: 600; }
+    .classification-harmful   { color: #fc8181; font-weight: 600; }
+
+    /* ── Diet plan markdown ───────────────────────────────────────────────── */
+    .diet-plan-content {
+      background: #1a202c;
+      border: 1px solid #2d3748;
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      line-height: 1.8;
+    }
+    .diet-plan-content h1,
+    .diet-plan-content h2,
+    .diet-plan-content h3 {
+      color: #90cdf4;
+      margin: 1.25rem 0 0.5rem;
+    }
+    .diet-plan-content h1 { font-size: 1.3rem; }
+    .diet-plan-content h2 { font-size: 1.1rem; border-bottom: 1px solid #2d3748; padding-bottom: 0.35rem; }
+    .diet-plan-content h3 { font-size: 1rem; }
+    .diet-plan-content p  { margin: 0.6rem 0; color: #cbd5e0; }
+    .diet-plan-content ul,
+    .diet-plan-content ol { margin: 0.5rem 0 0.5rem 1.5rem; }
+    .diet-plan-content li { margin: 0.3rem 0; color: #cbd5e0; }
+    .diet-plan-content strong { color: #f7fafc; }
+    .diet-plan-content code {
+      background: #2d3748;
+      padding: 0.1rem 0.35rem;
+      border-radius: 0.25rem;
+      font-size: 0.85em;
+      color: #f6ad55;
+    }
+    .diet-plan-content pre {
+      background: #2d3748;
+      padding: 1rem;
+      border-radius: 0.4rem;
+      overflow-x: auto;
+      margin: 0.75rem 0;
+    }
+    .diet-plan-content blockquote {
+      border-left: 3px solid #4299e1;
+      padding-left: 1rem;
+      color: #a0aec0;
+      margin: 0.75rem 0;
+    }
+
+    /* ── CI narrative ─────────────────────────────────────────────────────── */
+    .ci-narrative {
+      background: #1a202c;
+      border: 1px solid #2d3748;
+      border-left: 4px solid #9f7aea;
+      border-radius: 0.5rem;
+      padding: 1.25rem 1.5rem;
+    }
+    .ci-narrative p { color: #cbd5e0; margin: 0.5rem 0; }
+    .ci-badge {
+      display: inline-block;
+      background: #44337a;
+      color: #d6bcfa;
+      border: 1px solid #6b46c1;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 0.15rem 0.5rem;
+      border-radius: 9999px;
+      margin-bottom: 0.75rem;
+    }
+
+    /* ── Redundancy clusters ─────────────────────────────────────────────── */
+    .cluster-list {
+      list-style: none;
+      padding: 0;
+    }
+    .cluster-item {
+      background: #1a202c;
+      border: 1px solid #2d3748;
+      border-radius: 0.4rem;
+      padding: 0.6rem 1rem;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.85rem;
+    }
+    .cluster-badge {
+      background: #744210;
+      color: #fbd38d;
+      border: 1px solid #975a16;
+      padding: 0.15rem 0.45rem;
+      border-radius: 9999px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    /* ── Ordering table ──────────────────────────────────────────────────── */
+    .ordering-empty {
+      color: #718096;
+      font-style: italic;
+      padding: 1rem;
+    }
+
+    /* ── Usage footer ────────────────────────────────────────────────────── */
+    .usage-footer {
+      background: #1a202c;
+      border: 1px solid #2d3748;
+      border-radius: 0.5rem;
+      padding: 1rem 1.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+      font-size: 0.85rem;
+    }
+    .usage-item .usage-label { color: #718096; margin-bottom: 0.15rem; }
+    .usage-item .usage-value { color: #e2e8f0; font-weight: 600; }
+
+    /* ── Divider ─────────────────────────────────────────────────────────── */
+    .divider {
+      border: none;
+      border-top: 1px solid #2d3748;
+      margin: 2rem 0;
+    }
+  </style>
+</head>
+<body>
+<div class="page-wrapper">
+
+  <!-- ── Header ──────────────────────────────────────────────────────────── -->
+  <header class="report-header">
+    <h1>
+      ContextForge — Ablation Report
+      <span class="badge badge-demo">DEMO</span>
+    </h1>
+    <p class="subtitle">
+      Generated 2026-03-16 05:21 UTC &nbsp;·&nbsp;
+      Payload: <strong>Customer Support Agent</strong>
+    </p>
+  </header>
+
+  <!-- ── Executive Summary Cards ─────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Executive Summary</h2>
+    <div class="summary-grid">
+      <div class="summary-card card-neutral">
+        <div class="card-label">Baseline Tokens</div>
+        <div class="card-value">211,829</div>
+        <div class="card-sub">$0.0635/call</div>
+      </div>
+      <div class="summary-card card-positive">
+        <div class="card-label">Lean Tokens</div>
+        <div class="card-value">2,992</div>
+        <div class="card-sub">$0.0009/call</div>
+      </div>
+      <div class="summary-card card-positive">
+        <div class="card-label">Token Reduction</div>
+        <div class="card-value">98.6%</div>
+        <div class="card-sub">208,837 tokens saved</div>
+      </div>
+      <div class="summary-card card-positive">
+        <div class="card-label">Quality Retention</div>
+        <div class="card-value">100.0%</div>
+        <div class="card-sub">of baseline quality preserved</div>
+      </div>
+      <div class="summary-card card-warning">
+        <div class="card-label">Sections Tested</div>
+        <div class="card-value">79</div>
+        <div class="card-sub">71 removable · 0 essential</div>
+      </div>
+      <div class="summary-card card-neutral">
+        <div class="card-label">Total API Cost</div>
+        <div class="card-value">$36.47</div>
+        <div class="card-sub">960 Bedrock calls</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Quality Heatmap ──────────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Section × Tier Quality Heatmap</h2>
+    <div class="chart-container">
+      <p class="chart-description">
+        Quality delta when each section is removed, across reasoning tiers.
+        Red = section hurts quality when removed; blue = section helps quality when removed.
+      </p>
+      <div>                            <div id="ac1b0338-f8d5-4263-9980-2ac6f70e93b4" class="plotly-graph-div" style="height:2370px; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("ac1b0338-f8d5-4263-9980-2ac6f70e93b4")) {                    Plotly.newPlot(                        "ac1b0338-f8d5-4263-9980-2ac6f70e93b4",                        [{"colorbar":{"title":{"text":"Quality \u0394"}},"colorscale":[[0.0,"rgb(103,0,31)"],[0.1,"rgb(178,24,43)"],[0.2,"rgb(214,96,77)"],[0.3,"rgb(244,165,130)"],[0.4,"rgb(253,219,199)"],[0.5,"rgb(247,247,247)"],[0.6,"rgb(209,229,240)"],[0.7,"rgb(146,197,222)"],[0.8,"rgb(67,147,195)"],[0.9,"rgb(33,102,172)"],[1.0,"rgb(5,48,97)"]],"hoverongaps":false,"hovertemplate":"Section: %{y}\u003cbr\u003eTier: %{x}\u003cbr\u003e\u0394: %{z:.2f}\u003cextra\u003e\u003c\u002fextra\u003e","x":["disabled","medium"],"y":["Few-Shot Example 11","Conversation Turn 11","Deployment Trigger","Image Resizer","System Prompt \u2014 Agent Alex","Conversation Turn 6","Conversation Turn 8","Conversation Turn 17","Few-Shot Example 7","Few-Shot Example 14","Conversation Turn 16","Few-Shot Example 8","Few-Shot Example 9","Conversation Turn 34","Conversation Turn 31","DNS Resolver","Conversation Turn 32","Calendar Scheduler","Conversation Turn 4","Few-Shot Example 2","Conversation Turn 35","Conversation Turn 20","Conversation Turn 7","Few-Shot Example 1","Conversation Turn 30","Conversation Turn 15","Log Aggregator","Conversation Turn 36","Stock Price Lookup","Few-Shot Example 10","Conversation Turn 21","Legal Disclaimers \u2014 ToS, Privacy, Refund Policy","Conversation Turn 29","Few-Shot Example 12","Conversation Turn 13","Conversation Turn 25","Conversation Turn 12","Conversation Turn 24","Few-Shot Example 3","Company FAQ \u2014 Acme Cloud Platform","Conversation Turn 22","Conversation Turn 10","Conversation Turn 38","Audit Logger","Conversation Turn 1","Conversation Turn 40","Email Sender","Few-Shot Example 15","Conversation Turn 28","Conversation Turn 37","Markdown Converter","Notification Pusher","Conversation Turn 26","Conversation Turn 27","Health Checker","Few-Shot Example 6","Weather Checker","Backup Scheduler","Conversation Turn 5","Conversation Turn 39","Few-Shot Example 13","Language Translator","Conversation Turn 19","PDF Generator","Conversation Turn 3","Account Lookup","Refund Processor","Conversation Turn 18","Conversation Turn 33","Product Catalog \u2014 Acme Cloud Platform","Conversation Turn 2","Conversation Turn 14","Metric Dashboard","Cache Invalidator","Few-Shot Example 5","Few-Shot Example 4","Conversation Turn 23","Sentiment Analyzer","Conversation Turn 9"],"z":[[0.08333333333333333,2.5],[-0.5,2.4166666666666665],[-0.25,2.0833333333333335],[0.25,1.5833333333333333],[0.16666666666666666,1.4166666666666667],[-0.8333333333333334,2.3333333333333335],[0.08333333333333333,1.1666666666666667],[-0.4166666666666667,1.4166666666666667],[-0.5,1.4166666666666667],[-0.4166666666666667,1.3333333333333333],[-0.16666666666666666,1.0],[-0.4166666666666667,1.1666666666666667],[-0.9166666666666666,1.5833333333333333],[0.3333333333333333,0.16666666666666666],[0.16666666666666666,0.16666666666666666],[0.08333333333333333,0.25],[-1.25,1.4166666666666667],[-0.25,0.4166666666666667],[0.0,0.16666666666666666],[-0.5,0.6666666666666666],[-0.6666666666666666,0.75],[-0.4166666666666667,0.5],[-0.16666666666666666,0.16666666666666666],[-0.08333333333333333,0.08333333333333333],[0.5,-0.6666666666666666],[0.16666666666666666,-0.3333333333333333],[-0.08333333333333333,-0.08333333333333333],[-0.08333333333333333,-0.16666666666666666],[0.16666666666666666,-0.5],[0.8333333333333334,-1.3333333333333333],[-0.25,-0.25],[-0.6666666666666666,0.16666666666666666],[-0.6666666666666666,0.08333333333333333],[-0.25,-0.3333333333333333],[-0.6666666666666666,0.0],[-0.6666666666666666,0.0],[-0.08333333333333333,-0.5833333333333334],[0.16666666666666666,-0.8333333333333334],[-0.08333333333333333,-0.5833333333333334],[-0.5833333333333334,-0.16666666666666666],[-1.25,0.4166666666666667],[-0.6666666666666666,-0.25],[-2.25,1.3333333333333333],[-0.4166666666666667,-0.5],[-0.75,-0.25],[0.16666666666666666,-1.1666666666666667],[-0.5833333333333334,-0.5833333333333334],[-1.4166666666666667,0.25],[-1.75,0.5],[-0.75,-0.5],[-0.25,-1.0],[-0.6666666666666666,-0.5833333333333334],[-1.0833333333333333,-0.25],[-0.6666666666666666,-0.6666666666666666],[-0.6666666666666666,-0.6666666666666666],[-0.4166666666666667,-0.9166666666666666],[-0.5833333333333334,-0.75],[-0.75,-0.6666666666666666],[-0.4166666666666667,-1.0],[-1.0,-0.5833333333333334],[-1.9166666666666667,0.3333333333333333],[-0.16666666666666666,-1.5],[-0.6666666666666666,-1.0833333333333333],[-1.3333333333333333,-0.5],[-0.3333333333333333,-1.5833333333333333],[-0.08333333333333333,-1.8333333333333333],[-0.25,-1.6666666666666667],[-0.5833333333333334,-1.4166666666666667],[-1.75,-0.3333333333333333],[-1.9166666666666667,-0.25],[-1.25,-1.0],[-1.5,-0.75],[-0.25,-2.0],[-1.8333333333333333,-0.4166666666666667],[-0.9166666666666666,-1.3333333333333333],[-1.6666666666666667,-0.6666666666666666],[-1.25,-1.4166666666666667],[-1.25,-1.4166666666666667],[-1.4166666666666667,-1.5]],"zmid":0,"type":"heatmap"}],                        {"template":{"data":{"barpolar":[{"marker":{"line":{"color":"rgb(17,17,17)","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"bar":[{"error_x":{"color":"#f2f5fa"},"error_y":{"color":"#f2f5fa"},"marker":{"line":{"color":"rgb(17,17,17)","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"carpet":[{"aaxis":{"endlinecolor":"#A2B1C6","gridcolor":"#506784","linecolor":"#506784","minorgridcolor":"#506784","startlinecolor":"#A2B1C6"},"baxis":{"endlinecolor":"#A2B1C6","gridcolor":"#506784","linecolor":"#506784","minorgridcolor":"#506784","startlinecolor":"#A2B1C6"},"type":"carpet"}],"choropleth":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"choropleth"}],"contourcarpet":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"contourcarpet"}],"contour":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"contour"}],"heatmap":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"heatmap"}],"histogram2dcontour":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"histogram2dcontour"}],"histogram2d":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"histogram2d"}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"mesh3d":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"mesh3d"}],"parcoords":[{"line":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"parcoords"}],"pie":[{"automargin":true,"type":"pie"}],"scatter3d":[{"line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatter3d"}],"scattercarpet":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattercarpet"}],"scattergeo":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattergeo"}],"scattergl":[{"marker":{"line":{"color":"#283442"}},"type":"scattergl"}],"scattermapbox":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattermapbox"}],"scattermap":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattermap"}],"scatterpolargl":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterpolargl"}],"scatterpolar":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterpolar"}],"scatter":[{"marker":{"line":{"color":"#283442"}},"type":"scatter"}],"scatterternary":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterternary"}],"surface":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"surface"}],"table":[{"cells":{"fill":{"color":"#506784"},"line":{"color":"rgb(17,17,17)"}},"header":{"fill":{"color":"#2a3f5f"},"line":{"color":"rgb(17,17,17)"}},"type":"table"}]},"layout":{"annotationdefaults":{"arrowcolor":"#f2f5fa","arrowhead":0,"arrowwidth":1},"autotypenumbers":"strict","coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]],"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]},"colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#f2f5fa"},"geo":{"bgcolor":"rgb(17,17,17)","lakecolor":"rgb(17,17,17)","landcolor":"rgb(17,17,17)","showlakes":true,"showland":true,"subunitcolor":"#506784"},"hoverlabel":{"align":"left"},"hovermode":"closest","mapbox":{"style":"dark"},"paper_bgcolor":"rgb(17,17,17)","plot_bgcolor":"rgb(17,17,17)","polar":{"angularaxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""},"bgcolor":"rgb(17,17,17)","radialaxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""}},"scene":{"xaxis":{"backgroundcolor":"rgb(17,17,17)","gridcolor":"#506784","gridwidth":2,"linecolor":"#506784","showbackground":true,"ticks":"","zerolinecolor":"#C8D4E3"},"yaxis":{"backgroundcolor":"rgb(17,17,17)","gridcolor":"#506784","gridwidth":2,"linecolor":"#506784","showbackground":true,"ticks":"","zerolinecolor":"#C8D4E3"},"zaxis":{"backgroundcolor":"rgb(17,17,17)","gridcolor":"#506784","gridwidth":2,"linecolor":"#506784","showbackground":true,"ticks":"","zerolinecolor":"#C8D4E3"}},"shapedefaults":{"line":{"color":"#f2f5fa"}},"sliderdefaults":{"bgcolor":"#C8D4E3","bordercolor":"rgb(17,17,17)","borderwidth":1,"tickwidth":0},"ternary":{"aaxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""},"baxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""},"bgcolor":"rgb(17,17,17)","caxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""}},"title":{"x":0.05},"updatemenudefaults":{"bgcolor":"#506784","borderwidth":0},"xaxis":{"automargin":true,"gridcolor":"#283442","linecolor":"#506784","ticks":"","title":{"standoff":15},"zerolinecolor":"#283442","zerolinewidth":2},"yaxis":{"automargin":true,"gridcolor":"#283442","linecolor":"#506784","ticks":"","title":{"standoff":15},"zerolinecolor":"#283442","zerolinewidth":2}}},"margin":{"l":160,"r":40,"t":20,"b":60},"yaxis":{"title":{"text":""},"autorange":"reversed"},"height":2370,"xaxis":{"title":{"text":"Reasoning Tier"}}},                        {"responsive": true}                    )                };            </script>        </div>
+    </div>
+  </section>
+
+  <!-- ── Section Impact Waterfall ─────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Section Impact Ranking</h2>
+    <div class="chart-container">
+      <p class="chart-description">
+        Average quality delta per section, sorted highest to lowest.
+        Sections with positive delta help quality; those near zero are safe to remove.
+      </p>
+      <div>                            <div id="d8b934ba-85db-49bd-bf9f-b09792050dd8" class="plotly-graph-div" style="height:2212px; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("d8b934ba-85db-49bd-bf9f-b09792050dd8")) {                    Plotly.newPlot(                        "d8b934ba-85db-49bd-bf9f-b09792050dd8",                        [{"hovertemplate":"\u003cb\u003e%{y}\u003c\u002fb\u003e\u003cbr\u003eAvg \u0394: %{x:.2f}\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":["#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#fc8181","#f6ad55","#f6ad55","#f6ad55","#f6ad55","#f6ad55","#f6ad55","#f6ad55","#f6ad55","#f6ad55","#f6ad55","#f6ad55","#f6ad55","#f6ad55","#f6ad55","#f6ad55","#f6ad55","#63b3ed","#63b3ed","#63b3ed","#63b3ed","#63b3ed","#63b3ed","#63b3ed","#63b3ed"]},"orientation":"h","x":[-1.4583333333333335,-1.3333333333333335,-1.3333333333333335,-1.1666666666666667,-1.125,-1.125,-1.125,-1.125,-1.125,-1.0833333333333335,-1.0416666666666667,-1.0,-0.9583333333333334,-0.9583333333333333,-0.9583333333333333,-0.9166666666666666,-0.875,-0.8333333333333334,-0.7916666666666667,-0.7916666666666667,-0.7083333333333334,-0.7083333333333333,-0.6666666666666667,-0.6666666666666666,-0.6666666666666666,-0.6666666666666666,-0.6666666666666666,-0.625,-0.625,-0.625,-0.625,-0.5833333333333334,-0.5833333333333334,-0.5,-0.5,-0.45833333333333337,-0.45833333333333337,-0.4583333333333333,-0.41666666666666663,-0.375,-0.33333333333333337,-0.33333333333333337,-0.33333333333333337,-0.3333333333333333,-0.3333333333333333,-0.29166666666666663,-0.29166666666666663,-0.25,-0.25,-0.24999999999999994,-0.16666666666666669,-0.125,-0.08333333333333333,-0.08333333333333333,-0.08333333333333331,0.0,0.0,0.04166666666666666,0.041666666666666685,0.08333333333333331,0.08333333333333333,0.08333333333333334,0.08333333333333337,0.16666666666666666,0.16666666666666666,0.25,0.3333333333333333,0.375,0.4166666666666667,0.45833333333333326,0.45833333333333337,0.5,0.625,0.75,0.7916666666666667,0.9166666666666666,0.9166666666666667,0.9583333333333333,1.2916666666666667],"y":["Conversation Turn 9","Conversation Turn 23","Sentiment Analyzer","Few-Shot Example 4","Conversation Turn 2","Conversation Turn 14","Metric Dashboard","Cache Invalidator","Few-Shot Example 5","Product Catalog \u2014 Acme Cloud Platform","Conversation Turn 33","Conversation Turn 18","Refund Processor","Conversation Turn 3","Account Lookup","PDF Generator","Conversation Turn 19","Language Translator","Conversation Turn 39","Few-Shot Example 13","Conversation Turn 5","Backup Scheduler","Weather Checker","Conversation Turn 26","Conversation Turn 27","Health Checker","Few-Shot Example 6","Conversation Turn 28","Conversation Turn 37","Markdown Converter","Notification Pusher","Email Sender","Few-Shot Example 15","Conversation Turn 1","Conversation Turn 40","Conversation Turn 38","Audit Logger","Conversation Turn 10","Conversation Turn 22","Company FAQ \u2014 Acme Cloud Platform","Conversation Turn 12","Conversation Turn 24","Few-Shot Example 3","Conversation Turn 13","Conversation Turn 25","Conversation Turn 29","Few-Shot Example 12","Conversation Turn 21","Legal Disclaimers \u2014 ToS, Privacy, Refund Policy","Few-Shot Example 10","Stock Price Lookup","Conversation Turn 36","Conversation Turn 15","Log Aggregator","Conversation Turn 30","Conversation Turn 7","Few-Shot Example 1","Conversation Turn 20","Conversation Turn 35","Few-Shot Example 2","Conversation Turn 4","Calendar Scheduler","Conversation Turn 32","Conversation Turn 31","DNS Resolver","Conversation Turn 34","Few-Shot Example 9","Few-Shot Example 8","Conversation Turn 16","Few-Shot Example 14","Few-Shot Example 7","Conversation Turn 17","Conversation Turn 8","Conversation Turn 6","System Prompt \u2014 Agent Alex","Image Resizer","Deployment Trigger","Conversation Turn 11","Few-Shot Example 11"],"type":"bar"}],                        {"template":{"data":{"barpolar":[{"marker":{"line":{"color":"rgb(17,17,17)","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"bar":[{"error_x":{"color":"#f2f5fa"},"error_y":{"color":"#f2f5fa"},"marker":{"line":{"color":"rgb(17,17,17)","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"carpet":[{"aaxis":{"endlinecolor":"#A2B1C6","gridcolor":"#506784","linecolor":"#506784","minorgridcolor":"#506784","startlinecolor":"#A2B1C6"},"baxis":{"endlinecolor":"#A2B1C6","gridcolor":"#506784","linecolor":"#506784","minorgridcolor":"#506784","startlinecolor":"#A2B1C6"},"type":"carpet"}],"choropleth":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"choropleth"}],"contourcarpet":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"contourcarpet"}],"contour":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"contour"}],"heatmap":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"heatmap"}],"histogram2dcontour":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"histogram2dcontour"}],"histogram2d":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"histogram2d"}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"mesh3d":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"mesh3d"}],"parcoords":[{"line":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"parcoords"}],"pie":[{"automargin":true,"type":"pie"}],"scatter3d":[{"line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatter3d"}],"scattercarpet":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattercarpet"}],"scattergeo":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattergeo"}],"scattergl":[{"marker":{"line":{"color":"#283442"}},"type":"scattergl"}],"scattermapbox":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattermapbox"}],"scattermap":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattermap"}],"scatterpolargl":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterpolargl"}],"scatterpolar":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterpolar"}],"scatter":[{"marker":{"line":{"color":"#283442"}},"type":"scatter"}],"scatterternary":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterternary"}],"surface":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"surface"}],"table":[{"cells":{"fill":{"color":"#506784"},"line":{"color":"rgb(17,17,17)"}},"header":{"fill":{"color":"#2a3f5f"},"line":{"color":"rgb(17,17,17)"}},"type":"table"}]},"layout":{"annotationdefaults":{"arrowcolor":"#f2f5fa","arrowhead":0,"arrowwidth":1},"autotypenumbers":"strict","coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]],"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]},"colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#f2f5fa"},"geo":{"bgcolor":"rgb(17,17,17)","lakecolor":"rgb(17,17,17)","landcolor":"rgb(17,17,17)","showlakes":true,"showland":true,"subunitcolor":"#506784"},"hoverlabel":{"align":"left"},"hovermode":"closest","mapbox":{"style":"dark"},"paper_bgcolor":"rgb(17,17,17)","plot_bgcolor":"rgb(17,17,17)","polar":{"angularaxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""},"bgcolor":"rgb(17,17,17)","radialaxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""}},"scene":{"xaxis":{"backgroundcolor":"rgb(17,17,17)","gridcolor":"#506784","gridwidth":2,"linecolor":"#506784","showbackground":true,"ticks":"","zerolinecolor":"#C8D4E3"},"yaxis":{"backgroundcolor":"rgb(17,17,17)","gridcolor":"#506784","gridwidth":2,"linecolor":"#506784","showbackground":true,"ticks":"","zerolinecolor":"#C8D4E3"},"zaxis":{"backgroundcolor":"rgb(17,17,17)","gridcolor":"#506784","gridwidth":2,"linecolor":"#506784","showbackground":true,"ticks":"","zerolinecolor":"#C8D4E3"}},"shapedefaults":{"line":{"color":"#f2f5fa"}},"sliderdefaults":{"bgcolor":"#C8D4E3","bordercolor":"rgb(17,17,17)","borderwidth":1,"tickwidth":0},"ternary":{"aaxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""},"baxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""},"bgcolor":"rgb(17,17,17)","caxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""}},"title":{"x":0.05},"updatemenudefaults":{"bgcolor":"#506784","borderwidth":0},"xaxis":{"automargin":true,"gridcolor":"#283442","linecolor":"#506784","ticks":"","title":{"standoff":15},"zerolinecolor":"#283442","zerolinewidth":2},"yaxis":{"automargin":true,"gridcolor":"#283442","linecolor":"#506784","ticks":"","title":{"standoff":15},"zerolinecolor":"#283442","zerolinewidth":2}}},"margin":{"l":160,"r":40,"t":20,"b":60},"height":2212,"xaxis":{"title":{"text":"Average Quality Delta (baseline \u2212 ablated)"}},"yaxis":{"title":{"text":""}},"shapes":[{"line":{"color":"#718096","dash":"dot","width":1},"type":"line","x0":0,"x1":0,"y0":-0.5,"y1":78.5}]},                        {"responsive": true}                    )                };            </script>        </div>
+    </div>
+  </section>
+
+  <!-- ── Pareto Frontier ──────────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Pareto Frontier: Quality vs. Token Count</h2>
+    <div class="chart-container">
+      <p class="chart-description">
+        Non-dominated configurations on the quality vs. token-count tradeoff.
+        Points on the frontier offer the best quality for a given token budget.
+      </p>
+      <div>                            <div id="a3c80f07-050c-4f65-a345-77f130e7f751" class="plotly-graph-div" style="height:400px; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("a3c80f07-050c-4f65-a345-77f130e7f751")) {                    Plotly.newPlot(                        "a3c80f07-050c-4f65-a345-77f130e7f751",                        [{"line":{"color":"#4299e1","dash":"dot","width":1.5},"mode":"lines","name":"Pareto frontier","showlegend":true,"x":[0,172,254,725,1315,2726,2815,2912,2992,3148,3321,3443,3599,3755,3851,4365,4419,4511,5049,5144,5316,5382,5510],"y":[33.45833333333334,34.75000000000001,35.70833333333334,36.62500000000001,37.54166666666667,38.33333333333334,39.08333333333334,39.70833333333334,40.20833333333334,40.66666666666668,41.125000000000014,41.54166666666668,41.91666666666668,42.250000000000014,42.500000000000014,42.66666666666668,42.83333333333334,42.91666666666668,43.000000000000014,43.08333333333335,43.166666666666686,43.20833333333335,43.250000000000014],"type":"scatter"},{"hovertemplate":"%{text}\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#63b3ed","line":{"color":"#2b6cb0","width":1},"size":10},"mode":"markers","name":"Configurations","showlegend":true,"text":["Sections: 22\u003cbr\u003eTokens: 5,510\u003cbr\u003eQuality: 43.25","Sections: 21\u003cbr\u003eTokens: 5,382\u003cbr\u003eQuality: 43.21","Sections: 20\u003cbr\u003eTokens: 5,316\u003cbr\u003eQuality: 43.17","Sections: 19\u003cbr\u003eTokens: 5,144\u003cbr\u003eQuality: 43.08","Sections: 18\u003cbr\u003eTokens: 5,049\u003cbr\u003eQuality: 43.00","Sections: 17\u003cbr\u003eTokens: 4,511\u003cbr\u003eQuality: 42.92","Sections: 16\u003cbr\u003eTokens: 4,419\u003cbr\u003eQuality: 42.83","Sections: 15\u003cbr\u003eTokens: 4,365\u003cbr\u003eQuality: 42.67","Sections: 14\u003cbr\u003eTokens: 3,851\u003cbr\u003eQuality: 42.50","Sections: 13\u003cbr\u003eTokens: 3,755\u003cbr\u003eQuality: 42.25","Sections: 12\u003cbr\u003eTokens: 3,599\u003cbr\u003eQuality: 41.92","Sections: 11\u003cbr\u003eTokens: 3,443\u003cbr\u003eQuality: 41.54","Sections: 10\u003cbr\u003eTokens: 3,321\u003cbr\u003eQuality: 41.13","Sections: 9\u003cbr\u003eTokens: 3,148\u003cbr\u003eQuality: 40.67","Sections: 8\u003cbr\u003eTokens: 2,992\u003cbr\u003eQuality: 40.21","Sections: 7\u003cbr\u003eTokens: 2,912\u003cbr\u003eQuality: 39.71","Sections: 6\u003cbr\u003eTokens: 2,815\u003cbr\u003eQuality: 39.08","Sections: 5\u003cbr\u003eTokens: 2,726\u003cbr\u003eQuality: 38.33","Sections: 4\u003cbr\u003eTokens: 1,315\u003cbr\u003eQuality: 37.54","Sections: 3\u003cbr\u003eTokens: 725\u003cbr\u003eQuality: 36.63","Sections: 2\u003cbr\u003eTokens: 254\u003cbr\u003eQuality: 35.71","Sections: 1\u003cbr\u003eTokens: 172\u003cbr\u003eQuality: 34.75","Sections: 0\u003cbr\u003eTokens: 0\u003cbr\u003eQuality: 33.46"],"x":[5510,5382,5316,5144,5049,4511,4419,4365,3851,3755,3599,3443,3321,3148,2992,2912,2815,2726,1315,725,254,172,0],"y":[43.250000000000014,43.20833333333335,43.166666666666686,43.08333333333335,43.000000000000014,42.91666666666668,42.83333333333334,42.66666666666668,42.500000000000014,42.250000000000014,41.91666666666668,41.54166666666668,41.125000000000014,40.66666666666668,40.20833333333334,39.70833333333334,39.08333333333334,38.33333333333334,37.54166666666667,36.62500000000001,35.70833333333334,34.75000000000001,33.45833333333334],"type":"scatter"}],                        {"template":{"data":{"barpolar":[{"marker":{"line":{"color":"rgb(17,17,17)","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"bar":[{"error_x":{"color":"#f2f5fa"},"error_y":{"color":"#f2f5fa"},"marker":{"line":{"color":"rgb(17,17,17)","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"carpet":[{"aaxis":{"endlinecolor":"#A2B1C6","gridcolor":"#506784","linecolor":"#506784","minorgridcolor":"#506784","startlinecolor":"#A2B1C6"},"baxis":{"endlinecolor":"#A2B1C6","gridcolor":"#506784","linecolor":"#506784","minorgridcolor":"#506784","startlinecolor":"#A2B1C6"},"type":"carpet"}],"choropleth":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"choropleth"}],"contourcarpet":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"contourcarpet"}],"contour":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"contour"}],"heatmap":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"heatmap"}],"histogram2dcontour":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"histogram2dcontour"}],"histogram2d":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"histogram2d"}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"mesh3d":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"mesh3d"}],"parcoords":[{"line":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"parcoords"}],"pie":[{"automargin":true,"type":"pie"}],"scatter3d":[{"line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatter3d"}],"scattercarpet":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattercarpet"}],"scattergeo":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattergeo"}],"scattergl":[{"marker":{"line":{"color":"#283442"}},"type":"scattergl"}],"scattermapbox":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattermapbox"}],"scattermap":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattermap"}],"scatterpolargl":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterpolargl"}],"scatterpolar":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterpolar"}],"scatter":[{"marker":{"line":{"color":"#283442"}},"type":"scatter"}],"scatterternary":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterternary"}],"surface":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"surface"}],"table":[{"cells":{"fill":{"color":"#506784"},"line":{"color":"rgb(17,17,17)"}},"header":{"fill":{"color":"#2a3f5f"},"line":{"color":"rgb(17,17,17)"}},"type":"table"}]},"layout":{"annotationdefaults":{"arrowcolor":"#f2f5fa","arrowhead":0,"arrowwidth":1},"autotypenumbers":"strict","coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]],"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]},"colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#f2f5fa"},"geo":{"bgcolor":"rgb(17,17,17)","lakecolor":"rgb(17,17,17)","landcolor":"rgb(17,17,17)","showlakes":true,"showland":true,"subunitcolor":"#506784"},"hoverlabel":{"align":"left"},"hovermode":"closest","mapbox":{"style":"dark"},"paper_bgcolor":"rgb(17,17,17)","plot_bgcolor":"rgb(17,17,17)","polar":{"angularaxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""},"bgcolor":"rgb(17,17,17)","radialaxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""}},"scene":{"xaxis":{"backgroundcolor":"rgb(17,17,17)","gridcolor":"#506784","gridwidth":2,"linecolor":"#506784","showbackground":true,"ticks":"","zerolinecolor":"#C8D4E3"},"yaxis":{"backgroundcolor":"rgb(17,17,17)","gridcolor":"#506784","gridwidth":2,"linecolor":"#506784","showbackground":true,"ticks":"","zerolinecolor":"#C8D4E3"},"zaxis":{"backgroundcolor":"rgb(17,17,17)","gridcolor":"#506784","gridwidth":2,"linecolor":"#506784","showbackground":true,"ticks":"","zerolinecolor":"#C8D4E3"}},"shapedefaults":{"line":{"color":"#f2f5fa"}},"sliderdefaults":{"bgcolor":"#C8D4E3","bordercolor":"rgb(17,17,17)","borderwidth":1,"tickwidth":0},"ternary":{"aaxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""},"baxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""},"bgcolor":"rgb(17,17,17)","caxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""}},"title":{"x":0.05},"updatemenudefaults":{"bgcolor":"#506784","borderwidth":0},"xaxis":{"automargin":true,"gridcolor":"#283442","linecolor":"#506784","ticks":"","title":{"standoff":15},"zerolinecolor":"#283442","zerolinewidth":2},"yaxis":{"automargin":true,"gridcolor":"#283442","linecolor":"#506784","ticks":"","title":{"standoff":15},"zerolinecolor":"#283442","zerolinewidth":2}}},"margin":{"l":60,"r":40,"t":20,"b":60},"height":400,"xaxis":{"title":{"text":"Token Count"}},"yaxis":{"title":{"text":"Quality Score"}}},                        {"responsive": true}                    )                };            </script>        </div>
+    </div>
+  </section>
+
+  <!-- ── Tier Sensitivity Radar ────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Reasoning Tier Sensitivity</h2>
+    <div class="chart-container">
+      <p class="chart-description">
+        Tier sensitivity score per section (variance of quality delta across tiers).
+        High variance means the section's importance depends on reasoning depth.
+      </p>
+      <div>                            <div id="251494ee-0ec9-49d2-b580-47fb8023fb94" class="plotly-graph-div" style="height:450px; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("251494ee-0ec9-49d2-b580-47fb8023fb94")) {                    Plotly.newPlot(                        "251494ee-0ec9-49d2-b580-47fb8023fb94",                        [{"fill":"toself","name":"Conversation Turn 38","opacity":0.65,"r":[-2.25,1.3333333333333333,-2.25],"theta":["disabled","medium","disabled"],"type":"scatterpolar"},{"fill":"toself","name":"Conversation Turn 6","opacity":0.65,"r":[-0.8333333333333334,2.3333333333333335,-0.8333333333333334],"theta":["disabled","medium","disabled"],"type":"scatterpolar"},{"fill":"toself","name":"Conversation Turn 11","opacity":0.65,"r":[-0.5,2.4166666666666665,-0.5],"theta":["disabled","medium","disabled"],"type":"scatterpolar"},{"fill":"toself","name":"Conversation Turn 32","opacity":0.65,"r":[-1.25,1.4166666666666667,-1.25],"theta":["disabled","medium","disabled"],"type":"scatterpolar"},{"fill":"toself","name":"Few-Shot Example 9","opacity":0.65,"r":[-0.9166666666666666,1.5833333333333333,-0.9166666666666666],"theta":["disabled","medium","disabled"],"type":"scatterpolar"},{"fill":"toself","name":"Few-Shot Example 11","opacity":0.65,"r":[0.08333333333333333,2.5,0.08333333333333333],"theta":["disabled","medium","disabled"],"type":"scatterpolar"},{"fill":"toself","name":"Deployment Trigger","opacity":0.65,"r":[-0.25,2.0833333333333335,-0.25],"theta":["disabled","medium","disabled"],"type":"scatterpolar"},{"fill":"toself","name":"Conversation Turn 28","opacity":0.65,"r":[-1.75,0.5,-1.75],"theta":["disabled","medium","disabled"],"type":"scatterpolar"}],                        {"template":{"data":{"barpolar":[{"marker":{"line":{"color":"rgb(17,17,17)","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"bar":[{"error_x":{"color":"#f2f5fa"},"error_y":{"color":"#f2f5fa"},"marker":{"line":{"color":"rgb(17,17,17)","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"carpet":[{"aaxis":{"endlinecolor":"#A2B1C6","gridcolor":"#506784","linecolor":"#506784","minorgridcolor":"#506784","startlinecolor":"#A2B1C6"},"baxis":{"endlinecolor":"#A2B1C6","gridcolor":"#506784","linecolor":"#506784","minorgridcolor":"#506784","startlinecolor":"#A2B1C6"},"type":"carpet"}],"choropleth":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"choropleth"}],"contourcarpet":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"contourcarpet"}],"contour":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"contour"}],"heatmap":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"heatmap"}],"histogram2dcontour":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"histogram2dcontour"}],"histogram2d":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"histogram2d"}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"mesh3d":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"mesh3d"}],"parcoords":[{"line":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"parcoords"}],"pie":[{"automargin":true,"type":"pie"}],"scatter3d":[{"line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatter3d"}],"scattercarpet":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattercarpet"}],"scattergeo":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattergeo"}],"scattergl":[{"marker":{"line":{"color":"#283442"}},"type":"scattergl"}],"scattermapbox":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattermapbox"}],"scattermap":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattermap"}],"scatterpolargl":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterpolargl"}],"scatterpolar":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterpolar"}],"scatter":[{"marker":{"line":{"color":"#283442"}},"type":"scatter"}],"scatterternary":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterternary"}],"surface":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"surface"}],"table":[{"cells":{"fill":{"color":"#506784"},"line":{"color":"rgb(17,17,17)"}},"header":{"fill":{"color":"#2a3f5f"},"line":{"color":"rgb(17,17,17)"}},"type":"table"}]},"layout":{"annotationdefaults":{"arrowcolor":"#f2f5fa","arrowhead":0,"arrowwidth":1},"autotypenumbers":"strict","coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]],"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]},"colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#f2f5fa"},"geo":{"bgcolor":"rgb(17,17,17)","lakecolor":"rgb(17,17,17)","landcolor":"rgb(17,17,17)","showlakes":true,"showland":true,"subunitcolor":"#506784"},"hoverlabel":{"align":"left"},"hovermode":"closest","mapbox":{"style":"dark"},"paper_bgcolor":"rgb(17,17,17)","plot_bgcolor":"rgb(17,17,17)","polar":{"angularaxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""},"bgcolor":"rgb(17,17,17)","radialaxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""}},"scene":{"xaxis":{"backgroundcolor":"rgb(17,17,17)","gridcolor":"#506784","gridwidth":2,"linecolor":"#506784","showbackground":true,"ticks":"","zerolinecolor":"#C8D4E3"},"yaxis":{"backgroundcolor":"rgb(17,17,17)","gridcolor":"#506784","gridwidth":2,"linecolor":"#506784","showbackground":true,"ticks":"","zerolinecolor":"#C8D4E3"},"zaxis":{"backgroundcolor":"rgb(17,17,17)","gridcolor":"#506784","gridwidth":2,"linecolor":"#506784","showbackground":true,"ticks":"","zerolinecolor":"#C8D4E3"}},"shapedefaults":{"line":{"color":"#f2f5fa"}},"sliderdefaults":{"bgcolor":"#C8D4E3","bordercolor":"rgb(17,17,17)","borderwidth":1,"tickwidth":0},"ternary":{"aaxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""},"baxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""},"bgcolor":"rgb(17,17,17)","caxis":{"gridcolor":"#506784","linecolor":"#506784","ticks":""}},"title":{"x":0.05},"updatemenudefaults":{"bgcolor":"#506784","borderwidth":0},"xaxis":{"automargin":true,"gridcolor":"#283442","linecolor":"#506784","ticks":"","title":{"standoff":15},"zerolinecolor":"#283442","zerolinewidth":2},"yaxis":{"automargin":true,"gridcolor":"#283442","linecolor":"#506784","ticks":"","title":{"standoff":15},"zerolinecolor":"#283442","zerolinewidth":2}}},"margin":{"l":40,"r":40,"t":30,"b":40},"polar":{"radialaxis":{"title":{"text":"Quality \u0394"},"visible":true}},"legend":{"orientation":"v","x":1.02},"height":450},                        {"responsive": true}                    )                };            </script>        </div>
+    </div>
+  </section>
+
+  <!-- ── Section Details Table ─────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Section Details</h2>
+    <div class="chart-container" style="overflow-x: auto;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Section</th>
+            <th>Type</th>
+            <th>Tokens</th>
+            <th>Avg Δ</th>
+            <th>Tier Sensitivity</th>
+            <th>Quality/Token</th>
+            <th>Classification</th>
+          </tr>
+        </thead>
+        <tbody>
+          
+          <tr>
+            <td>Few-Shot Example 11</td>
+            <td>few_shot_example</td>
+            <td>172</td>
+            <td>+1.29</td>
+            <td>1.460</td>
+            <td>0.00751</td>
+            <td class="classification-moderate">moderate</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 11</td>
+            <td>conversation_turn</td>
+            <td>82</td>
+            <td>+0.96</td>
+            <td>2.127</td>
+            <td>0.01169</td>
+            <td class="classification-moderate">moderate</td>
+          </tr>
+          
+          <tr>
+            <td>Deployment Trigger</td>
+            <td>tool_definition</td>
+            <td>471</td>
+            <td>+0.92</td>
+            <td>1.361</td>
+            <td>0.00195</td>
+            <td class="classification-moderate">moderate</td>
+          </tr>
+          
+          <tr>
+            <td>Image Resizer</td>
+            <td>tool_definition</td>
+            <td>590</td>
+            <td>+0.92</td>
+            <td>0.444</td>
+            <td>0.00155</td>
+            <td class="classification-moderate">moderate</td>
+          </tr>
+          
+          <tr>
+            <td>System Prompt — Agent Alex</td>
+            <td>system_prompt</td>
+            <td>1,411</td>
+            <td>+0.79</td>
+            <td>0.391</td>
+            <td>0.00056</td>
+            <td class="classification-moderate">moderate</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 6</td>
+            <td>conversation_turn</td>
+            <td>89</td>
+            <td>+0.75</td>
+            <td>2.507</td>
+            <td>0.00843</td>
+            <td class="classification-moderate">moderate</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 8</td>
+            <td>conversation_turn</td>
+            <td>97</td>
+            <td>+0.62</td>
+            <td>0.293</td>
+            <td>0.00644</td>
+            <td class="classification-moderate">moderate</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 17</td>
+            <td>conversation_turn</td>
+            <td>80</td>
+            <td>+0.50</td>
+            <td>0.840</td>
+            <td>0.00625</td>
+            <td class="classification-moderate">moderate</td>
+          </tr>
+          
+          <tr>
+            <td>Few-Shot Example 7</td>
+            <td>few_shot_example</td>
+            <td>156</td>
+            <td>+0.46</td>
+            <td>0.918</td>
+            <td>0.00294</td>
+            <td class="classification-removable">removable</td>
+          </tr>
+          
+          <tr>
+            <td>Few-Shot Example 14</td>
+            <td>few_shot_example</td>
+            <td>173</td>
+            <td>+0.46</td>
+            <td>0.766</td>
+            <td>0.00265</td>
+            <td class="classification-removable">removable</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 16</td>
+            <td>conversation_turn</td>
+            <td>122</td>
+            <td>+0.42</td>
+            <td>0.340</td>
+            <td>0.00342</td>
+            <td class="classification-removable">removable</td>
+          </tr>
+          
+          <tr>
+            <td>Few-Shot Example 8</td>
+            <td>few_shot_example</td>
+            <td>156</td>
+            <td>+0.38</td>
+            <td>0.627</td>
+            <td>0.00240</td>
+            <td class="classification-removable">removable</td>
+          </tr>
+          
+          <tr>
+            <td>Few-Shot Example 9</td>
+            <td>few_shot_example</td>
+            <td>156</td>
+            <td>+0.33</td>
+            <td>1.562</td>
+            <td>0.00214</td>
+            <td class="classification-removable">removable</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 34</td>
+            <td>conversation_turn</td>
+            <td>96</td>
+            <td>+0.25</td>
+            <td>0.007</td>
+            <td>0.00260</td>
+            <td class="classification-removable">removable</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 31</td>
+            <td>conversation_turn</td>
+            <td>54</td>
+            <td>+0.17</td>
+            <td>0.000</td>
+            <td>0.00309</td>
+            <td class="classification-removable">removable</td>
+          </tr>
+          
+          <tr>
+            <td>DNS Resolver</td>
+            <td>tool_definition</td>
+            <td>514</td>
+            <td>+0.17</td>
+            <td>0.007</td>
+            <td>0.00032</td>
+            <td class="classification-removable">removable</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 32</td>
+            <td>conversation_turn</td>
+            <td>92</td>
+            <td>+0.08</td>
+            <td>1.778</td>
+            <td>0.00091</td>
+            <td class="classification-removable">removable</td>
+          </tr>
+          
+          <tr>
+            <td>Calendar Scheduler</td>
+            <td>tool_definition</td>
+            <td>538</td>
+            <td>+0.08</td>
+            <td>0.111</td>
+            <td>0.00015</td>
+            <td class="classification-removable">removable</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 4</td>
+            <td>conversation_turn</td>
+            <td>95</td>
+            <td>+0.08</td>
+            <td>0.007</td>
+            <td>0.00088</td>
+            <td class="classification-removable">removable</td>
+          </tr>
+          
+          <tr>
+            <td>Few-Shot Example 2</td>
+            <td>few_shot_example</td>
+            <td>172</td>
+            <td>+0.08</td>
+            <td>0.340</td>
+            <td>0.00048</td>
+            <td class="classification-removable">removable</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 35</td>
+            <td>conversation_turn</td>
+            <td>66</td>
+            <td>+0.04</td>
+            <td>0.502</td>
+            <td>0.00063</td>
+            <td class="classification-removable">removable</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 20</td>
+            <td>conversation_turn</td>
+            <td>128</td>
+            <td>+0.04</td>
+            <td>0.210</td>
+            <td>0.00033</td>
+            <td class="classification-removable">removable</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 7</td>
+            <td>conversation_turn</td>
+            <td>83</td>
+            <td>+0.00</td>
+            <td>0.028</td>
+            <td>0.00000</td>
+            <td class="classification-removable">removable</td>
+          </tr>
+          
+          <tr>
+            <td>Few-Shot Example 1</td>
+            <td>few_shot_example</td>
+            <td>162</td>
+            <td>+0.00</td>
+            <td>0.007</td>
+            <td>0.00000</td>
+            <td class="classification-removable">removable</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 30</td>
+            <td>conversation_turn</td>
+            <td>93</td>
+            <td>-0.08</td>
+            <td>0.340</td>
+            <td>-0.00090</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 15</td>
+            <td>conversation_turn</td>
+            <td>66</td>
+            <td>-0.08</td>
+            <td>0.062</td>
+            <td>-0.00126</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Log Aggregator</td>
+            <td>tool_definition</td>
+            <td>504</td>
+            <td>-0.08</td>
+            <td>0.000</td>
+            <td>-0.00017</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 36</td>
+            <td>conversation_turn</td>
+            <td>104</td>
+            <td>-0.12</td>
+            <td>0.002</td>
+            <td>-0.00120</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Stock Price Lookup</td>
+            <td>tool_definition</td>
+            <td>571</td>
+            <td>-0.17</td>
+            <td>0.111</td>
+            <td>-0.00029</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Few-Shot Example 10</td>
+            <td>few_shot_example</td>
+            <td>153</td>
+            <td>-0.25</td>
+            <td>1.174</td>
+            <td>-0.00163</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 21</td>
+            <td>conversation_turn</td>
+            <td>85</td>
+            <td>-0.25</td>
+            <td>0.000</td>
+            <td>-0.00294</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Legal Disclaimers — ToS, Privacy, Refund Policy</td>
+            <td>custom</td>
+            <td>5,153</td>
+            <td>-0.25</td>
+            <td>0.174</td>
+            <td>-0.00005</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 29</td>
+            <td>conversation_turn</td>
+            <td>67</td>
+            <td>-0.29</td>
+            <td>0.141</td>
+            <td>-0.00435</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Few-Shot Example 12</td>
+            <td>few_shot_example</td>
+            <td>169</td>
+            <td>-0.29</td>
+            <td>0.002</td>
+            <td>-0.00173</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 13</td>
+            <td>conversation_turn</td>
+            <td>60</td>
+            <td>-0.33</td>
+            <td>0.111</td>
+            <td>-0.00556</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 25</td>
+            <td>conversation_turn</td>
+            <td>63</td>
+            <td>-0.33</td>
+            <td>0.111</td>
+            <td>-0.00529</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 12</td>
+            <td>conversation_turn</td>
+            <td>95</td>
+            <td>-0.33</td>
+            <td>0.063</td>
+            <td>-0.00351</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 24</td>
+            <td>conversation_turn</td>
+            <td>111</td>
+            <td>-0.33</td>
+            <td>0.250</td>
+            <td>-0.00300</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Few-Shot Example 3</td>
+            <td>few_shot_example</td>
+            <td>163</td>
+            <td>-0.33</td>
+            <td>0.063</td>
+            <td>-0.00204</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Company FAQ — Acme Cloud Platform</td>
+            <td>rag_document</td>
+            <td>49,834</td>
+            <td>-0.38</td>
+            <td>0.043</td>
+            <td>-0.00001</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 22</td>
+            <td>conversation_turn</td>
+            <td>121</td>
+            <td>-0.42</td>
+            <td>0.694</td>
+            <td>-0.00344</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 10</td>
+            <td>conversation_turn</td>
+            <td>92</td>
+            <td>-0.46</td>
+            <td>0.043</td>
+            <td>-0.00498</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 38</td>
+            <td>conversation_turn</td>
+            <td>111</td>
+            <td>-0.46</td>
+            <td>3.210</td>
+            <td>-0.00413</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Audit Logger</td>
+            <td>tool_definition</td>
+            <td>510</td>
+            <td>-0.46</td>
+            <td>0.002</td>
+            <td>-0.00090</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 1</td>
+            <td>conversation_turn</td>
+            <td>83</td>
+            <td>-0.50</td>
+            <td>0.062</td>
+            <td>-0.00602</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 40</td>
+            <td>conversation_turn</td>
+            <td>74</td>
+            <td>-0.50</td>
+            <td>0.444</td>
+            <td>-0.00676</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Email Sender</td>
+            <td>tool_definition</td>
+            <td>503</td>
+            <td>-0.58</td>
+            <td>0.000</td>
+            <td>-0.00116</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Few-Shot Example 15</td>
+            <td>few_shot_example</td>
+            <td>174</td>
+            <td>-0.58</td>
+            <td>0.694</td>
+            <td>-0.00335</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 28</td>
+            <td>conversation_turn</td>
+            <td>95</td>
+            <td>-0.62</td>
+            <td>1.266</td>
+            <td>-0.00658</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 37</td>
+            <td>conversation_turn</td>
+            <td>113</td>
+            <td>-0.62</td>
+            <td>0.016</td>
+            <td>-0.00553</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Markdown Converter</td>
+            <td>tool_definition</td>
+            <td>470</td>
+            <td>-0.62</td>
+            <td>0.141</td>
+            <td>-0.00133</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Notification Pusher</td>
+            <td>tool_definition</td>
+            <td>511</td>
+            <td>-0.62</td>
+            <td>0.002</td>
+            <td>-0.00122</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 26</td>
+            <td>conversation_turn</td>
+            <td>127</td>
+            <td>-0.67</td>
+            <td>0.174</td>
+            <td>-0.00525</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 27</td>
+            <td>conversation_turn</td>
+            <td>53</td>
+            <td>-0.67</td>
+            <td>0.000</td>
+            <td>-0.01258</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Health Checker</td>
+            <td>tool_definition</td>
+            <td>469</td>
+            <td>-0.67</td>
+            <td>0.000</td>
+            <td>-0.00142</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Few-Shot Example 6</td>
+            <td>few_shot_example</td>
+            <td>157</td>
+            <td>-0.67</td>
+            <td>0.062</td>
+            <td>-0.00425</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Weather Checker</td>
+            <td>tool_definition</td>
+            <td>558</td>
+            <td>-0.67</td>
+            <td>0.007</td>
+            <td>-0.00119</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Backup Scheduler</td>
+            <td>tool_definition</td>
+            <td>501</td>
+            <td>-0.71</td>
+            <td>0.002</td>
+            <td>-0.00141</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 5</td>
+            <td>conversation_turn</td>
+            <td>84</td>
+            <td>-0.71</td>
+            <td>0.085</td>
+            <td>-0.00843</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 39</td>
+            <td>conversation_turn</td>
+            <td>114</td>
+            <td>-0.79</td>
+            <td>0.043</td>
+            <td>-0.00694</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Few-Shot Example 13</td>
+            <td>few_shot_example</td>
+            <td>157</td>
+            <td>-0.79</td>
+            <td>1.266</td>
+            <td>-0.00504</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Language Translator</td>
+            <td>tool_definition</td>
+            <td>494</td>
+            <td>-0.83</td>
+            <td>0.444</td>
+            <td>-0.00169</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 19</td>
+            <td>conversation_turn</td>
+            <td>65</td>
+            <td>-0.88</td>
+            <td>0.043</td>
+            <td>-0.01346</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>PDF Generator</td>
+            <td>tool_definition</td>
+            <td>484</td>
+            <td>-0.92</td>
+            <td>0.174</td>
+            <td>-0.00189</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 3</td>
+            <td>conversation_turn</td>
+            <td>105</td>
+            <td>-0.96</td>
+            <td>0.391</td>
+            <td>-0.00913</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Account Lookup</td>
+            <td>tool_definition</td>
+            <td>566</td>
+            <td>-0.96</td>
+            <td>0.766</td>
+            <td>-0.00169</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Refund Processor</td>
+            <td>tool_definition</td>
+            <td>779</td>
+            <td>-0.96</td>
+            <td>0.502</td>
+            <td>-0.00123</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 18</td>
+            <td>conversation_turn</td>
+            <td>89</td>
+            <td>-1.00</td>
+            <td>0.174</td>
+            <td>-0.01124</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 33</td>
+            <td>conversation_turn</td>
+            <td>60</td>
+            <td>-1.04</td>
+            <td>0.502</td>
+            <td>-0.01736</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Product Catalog — Acme Cloud Platform</td>
+            <td>rag_document</td>
+            <td>138,986</td>
+            <td>-1.08</td>
+            <td>0.694</td>
+            <td>-0.00001</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 2</td>
+            <td>conversation_turn</td>
+            <td>98</td>
+            <td>-1.12</td>
+            <td>0.016</td>
+            <td>-0.01148</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 14</td>
+            <td>conversation_turn</td>
+            <td>93</td>
+            <td>-1.12</td>
+            <td>0.141</td>
+            <td>-0.01210</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Metric Dashboard</td>
+            <td>tool_definition</td>
+            <td>446</td>
+            <td>-1.12</td>
+            <td>0.766</td>
+            <td>-0.00252</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Cache Invalidator</td>
+            <td>tool_definition</td>
+            <td>475</td>
+            <td>-1.12</td>
+            <td>0.502</td>
+            <td>-0.00237</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Few-Shot Example 5</td>
+            <td>few_shot_example</td>
+            <td>176</td>
+            <td>-1.12</td>
+            <td>0.043</td>
+            <td>-0.00639</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Few-Shot Example 4</td>
+            <td>few_shot_example</td>
+            <td>171</td>
+            <td>-1.17</td>
+            <td>0.250</td>
+            <td>-0.00682</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 23</td>
+            <td>conversation_turn</td>
+            <td>68</td>
+            <td>-1.33</td>
+            <td>0.007</td>
+            <td>-0.01961</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Sentiment Analyzer</td>
+            <td>tool_definition</td>
+            <td>485</td>
+            <td>-1.33</td>
+            <td>0.007</td>
+            <td>-0.00275</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+          <tr>
+            <td>Conversation Turn 9</td>
+            <td>conversation_turn</td>
+            <td>66</td>
+            <td>-1.46</td>
+            <td>0.002</td>
+            <td>-0.02210</td>
+            <td class="classification-harmful">harmful</td>
+          </tr>
+          
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Redundancy Clusters ────────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Redundancy Clusters</h2>
+    
+    <ul class="cluster-list">
+      
+      <li class="cluster-item">
+        <span class="cluster-badge">0.90</span>
+        <span>faq_001 ↔ legal_001</span>
+      </li>
+      
+      <li class="cluster-item">
+        <span class="cluster-badge">0.87</span>
+        <span>faq_001 ↔ catalog_001</span>
+      </li>
+      
+      <li class="cluster-item">
+        <span class="cluster-badge">0.84</span>
+        <span>catalog_001 ↔ legal_001</span>
+      </li>
+      
+    </ul>
+    
+  </section>
+
+  <!-- ── Ordering Findings ──────────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Ordering Experiment Findings</h2>
+    
+    <p class="ordering-empty">
+      Ordering experiments were not run for this mode (Full mode only).
+    </p>
+    
+  </section>
+
+  <!-- ── Context Diet Plan ──────────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Context Diet Plan</h2>
+    <div class="diet-plan-content">
+      <h3>Context Diet Plan</h3>
+<p>#### <strong>Executive Summary</strong></p>
+<ul>
+<li><strong>Before</strong>: Baseline context uses <strong>211,829 tokens</strong> at <strong>$0.0635/call</strong>.  </li>
+<li><strong>After</strong>: Optimized context reduced to <strong>2,992 tokens</strong> at <strong>$0.0009/call</strong>.  </li>
+<li><strong>Key Savings</strong>: <strong>98.6% token reduction</strong> (208,837 tokens saved), <strong>$0.0626/cost savings per call</strong>. Quality retained at <strong>100% of baseline</strong> within the 5% tolerance.  </li>
+</ul>
+<hr>
+<p>#### <strong>Priority Recommendations</strong>  </p>
+<p><em>Ordered by ROI: Highest token savings with minimal quality impact first.</em>  </p>
+<ol>
+<li><strong>Remove All "Harmful" Sections</strong>  </li>
+</ol>
+<p>   - <strong>Action</strong>: Delete all sections classified as "harmful" (negative quality delta when removed).  </p>
+<p>   - <strong>Sections</strong>:  </p>
+<p>     - <code>Few-Shot Example 10, 12, 3, 4, 5, 6, 13, 14, 15</code>  </p>
+<p>     - <code>Conversation Turn 1, 2, 3, 5, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24, 25, 26, 27, 28, 29, 33, 35, 36, 37, 38, 39, 40</code>  </p>
+<p>     - <code>Log Aggregator, Stock Price Lookup, Email Sender, Markdown Converter, Notification Pusher, Health Checker, Weather Checker, Backup Scheduler, Language Translator, PDF Generator, Account Lookup, Refund Processor, Metric Dashboard, Cache Invalidator, Sentiment Analyzer, Audit Logger</code>  </p>
+<p>     - <code>Legal Disclaimers — ToS, Privacy, Refund Policy</code>  </p>
+<p>     - <code>Company FAQ — Acme Cloud Platform, Product Catalog — Acme Cloud Platform</code>  </p>
+<p>   - <strong>Projected Savings</strong>: <strong>206,074 tokens</strong> removed → <strong>$0.0618/cost reduction</strong> (98.3% of total savings).  </p>
+<p>   - <strong>Quality Impact</strong>: <strong>+0.3% net improvement</strong> (sections harmed quality; removal boosts performance).  </p>
+<p>   - <strong>Rationale</strong>:  </p>
+<p>     - Ablation shows <em>negative</em> quality deltas (e.g., <code>Product Catalog</code>: <strong>−1.08</strong>, <code>Legal Disclaimers</code>: <strong>−0.25</strong>). Removing these <em>improves</em> output accuracy.  </p>
+<p>     - Largest token contributors (e.g., <code>Product Catalog</code>: 138,986 tokens) with no quality cost.  </p>
+<ol>
+<li><strong>Remove All "Removable" Sections</strong>  </li>
+</ol>
+<p>   - <strong>Action</strong>: Delete sections with low-magnitude positive deltas (within 5% tolerance).  </p>
+<p>   - <strong>Sections</strong>:  </p>
+<p>     - <code>Few-Shot Example 7, 8, 9, 2, 1</code>  </p>
+<p>     - <code>Conversation Turn 16, 34, 31, 32, 4, 35, 20, 7</code>  </p>
+<p>     - <code>DNS Resolver, Calendar Scheduler</code>  </p>
+<p>   - <strong>Projected Savings</strong>: <strong>2,763 tokens</strong> removed → <strong>$0.0008/cost reduction</strong> (remaining 0.7% savings).  </p>
+<p>   - <strong>Quality Impact</strong>: <strong>+3.04% cumulative drop</strong> (well within 5% tolerance).  </p>
+<p>   - <strong>Rationale</strong>:  </p>
+<p>     - Ablation deltas are small (+0.04 to +0.46). Example: <code>Few-Shot Example 7</code> (<strong>+0.46</strong>) removes only 156 tokens.  </p>
+<p>     - Net drop (3.04%) < 5% tolerance; validated by lean configuration retaining 100% quality.  </p>
+<p><strong>Total Savings</strong>: 208,837 tokens (98.6%), cost reduced <strong>$0.0626/call</strong>.  </p>
+<hr>
+<p>#### <strong>Redundancy Consolidations</strong>  </p>
+<p><em>Merge overlapping sections to avoid duplicate information.</em>  </p>
+<ul>
+<li><strong>Sections to Consolidate</strong>:  </li>
+</ul>
+<p>  - <code>faq<em>001</code> (Company FAQ), <code>legal</em>001</code> (Legal Disclaimers), <code>catalog_001</code> (Product Catalog).  </p>
+<ul>
+<li><strong>Action</strong>:  </li>
+</ul>
+<p>  - <strong>Remove all three</strong> (all are "harmful" and covered in Priority #1).  </p>
+<p>  - <strong>Why?</strong>  </p>
+<p>    - Redundancy cluster similarity ≥84% (<code>faq<em>001 ↔ legal</em>001: 0.90</code>).  </p>
+<p>    - Ablation confirms removing any one <em>improves</em> quality (deltas: <strong>−0.38</strong> to <strong>−1.08</strong>). Eliminating all three saves <strong>193,074 tokens</strong> with quality gains.  </p>
+<hr>
+<p>#### <strong>Ordering Optimizations</strong>  </p>
+<p><em>No reordering recommended.</em>  </p>
+<ul>
+<li><strong>Finding</strong>: "No ordering experiments were run (Full mode only)."  </li>
+<li><strong>Action</strong>: <strong>Defer optimization</strong> until A/B tests validate sequence sensitivity. Priority #1 and #2 deliver 98.6% savings without reordering risks.  </li>
+</ul>
+<hr>
+<p>#### <strong>What NOT to Remove</strong>  </p>
+<p><em>Essential sections for quality retention (100% baseline).</em>  </p>
+<ul>
+<li><strong>Keep All "Moderate" Sections</strong>:  </li>
+</ul>
+<p>  - <code>Few-Shot Example 11</code>  </p>
+<p>  - <code>Conversation Turn 11, 6, 8, 17</code>  </p>
+<p>  - <code>Deployment Trigger, Image Resizer, System Prompt — Agent Alex</code>  </p>
+<ul>
+<li><strong>Why?</strong>  </li>
+</ul>
+<p>  - Ablation shows <em>moderate</em> positive deltas when removed (e.g., <code>Few-Shot Example 11</code>: <strong>+1.29</strong>).  </p>
+<p>  - <strong>Lean configuration validation</strong>: These 8 sections alone achieve <strong>100% quality retention</strong> at 2,992 tokens. Removing any causes >1% quality drop.  </p>
+<p>  - Critical for core functionality (e.g., <code>System Prompt</code> anchors agent behavior).  </p>
+<hr>
+<p>#### <strong>Implementation Checklist</strong>  </p>
+<p><em>Step-by-step actions for developers.</em>  </p>
+<ol>
+<li><strong>Remove Harmful Sections</strong> (Priority #1):  </li>
+</ol>
+<p>   - Delete all sections listed in "Harmful" classification.  </p>
+<p>   - <em>Verification</em>: Token count drops to <strong>5,755 tokens</strong>; quality improves.  </p>
+<ol>
+<li><strong>Remove Removable Sections</strong> (Priority #2):  </li>
+</ol>
+<p>   - Delete all sections listed in "Removable" classification.  </p>
+<p>   - <em>Verification</em>: Token count drops to <strong>2,992 tokens</strong>; quality remains at <strong>100% baseline</strong> (within 5% tolerance).  </p>
+<ol>
+<li><strong>Retain Moderate Sections</strong>:  </li>
+</ol>
+<p>   - Preserve the 8 sections listed in "What NOT to Remove."  </p>
+<ol>
+<li><strong>Validate Quality</strong>:  </li>
+</ol>
+<p>   - Run end-to-end tests comparing baseline vs. optimized context.  </p>
+<p>   - <strong>Success Criteria</strong>: Quality variance ≤5% (target: 100% retention).  </p>
+<ol>
+<li><strong>Monitor Cost</strong>:  </li>
+</ol>
+<p>   - Post-deployment, confirm API cost drops to <strong>$0.0009/call</strong>.  </p>
+<ol>
+<li><strong>Future: Redundancy Consolidation</strong>:  </li>
+</ol>
+<p>   - If adding new FAQ/catalog sections, merge into a single RAG document to avoid repeats.  </p>
+<p><strong>Expected Outcome</strong>: Context payload optimized to <strong>2,992 tokens</strong> at <strong>$0.0009/call</strong> with zero quality regression.</p>
+    </div>
+  </section>
+
+  <!-- ── Code Interpreter Narrative ────────────────────────────────────────── -->
+  
+  <section class="section">
+    <h2 class="section-title">Nova Code Interpreter Analysis</h2>
+    <div class="ci-narrative">
+      <span class="ci-badge">Nova Code Interpreter</span>
+      <p>**Verification results**</p>
+<p>```text
+=== Token reduction verification ===
+Baseline tokens: 211,829
+Lean config tokens: 2,992
+Computed token reduction fraction: 0.9859
+Given token reduction fraction: 0.9859
+Difference (abs): 0.000025</p>
+<p>=== Section classification counts ===
+Essential: 0
+Moderate: 8
+Removable: 16
+Harmful: 55
+Total: 79</p>
+<p>=== Cost savings at $0.30/1M tokens ===
+Baseline cost: $0.063549
+Lean config cost: $0.000898
+Potential savings: $0.062651
+```</p>
+<p>**Analytical narrative**</p>
+<p>The ablation removed **98.59 %** of the context tokens (≈209 k → ≈3 k) while preserving the full quality of the model (quality‑retention fraction = 1.0000). This massive compression translates into a **~98.6 % reduction in API cost** at the standard $0.30 per million token rate, saving roughly **$0.06 per sweep** compared with the original $0.064 baseline. The classification breakdown shows that the majority of removed sections were **harmful** (55 of 79), indicating that a large portion of the original context was low‑value or detrimental, while only a modest number of *moderate* and *removable* sections contributed to the remaining cuts. The detection of **3 redundancy pairs** further suggests that additional compression could be achieved with targeted deduplication, offering a clear path toward even lower cost without sacrificing performance.</p>
+<pre style="margin-top:0.75rem;">=== Token reduction verification ===
+Baseline tokens: 211,829
+Lean config tokens: 2,992
+Computed token reduction fraction: 0.9859
+Given token reduction fraction: 0.9859
+Difference (abs): 0.000025
+
+=== Section classification counts ===
+Essential: 0
+Moderate: 8
+Removable: 16
+Harmful: 55
+Total: 79
+
+=== Cost savings at $0.30/1M tokens ===
+Baseline cost: $0.063549
+Lean config cost: $0.000898
+Potential savings: $0.062651</pre>
+    </div>
+  </section>
+  
+
+  <hr class="divider" />
+
+  <!-- ── API Usage Footer ───────────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">API Usage Summary</h2>
+    <div class="usage-footer">
+      <div class="usage-item">
+        <div class="usage-label">Total API Calls</div>
+        <div class="usage-value">960</div>
+      </div>
+      <div class="usage-item">
+        <div class="usage-label">Input Tokens</div>
+        <div class="usage-value">99,552,205</div>
+      </div>
+      <div class="usage-item">
+        <div class="usage-label">Output Tokens</div>
+        <div class="usage-value">2,642,463</div>
+      </div>
+      <div class="usage-item">
+        <div class="usage-label">Total Cost</div>
+        <div class="usage-value">$36.4718</div>
+      </div>
+      <div class="usage-item">
+        <div class="usage-label">Model</div>
+        <div class="usage-value">us.amazon.nova-2-lite-v1:0</div>
+      </div>
+    </div>
+  </section>
+
+</div><!-- /.page-wrapper -->
+</body>
+</html>
