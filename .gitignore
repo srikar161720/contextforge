@@ -46,3 +46,6 @@ htmlcov/
 # Data (generated artifacts — not tracked)
 data/demo_payloads/*.json
 data/eval_queries/*.json
+
+# Demo video (Remotion project)
+demo_vid/
