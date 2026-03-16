@@ -100,13 +100,13 @@ def test_score_response_calls_medium_reasoning():
 
 
 def test_score_response_calls_correct_params():
-    """score_response must call invoke() with temperature=0, max_tokens=8000."""
+    """score_response must call invoke() with temperature=0, max_tokens=16000."""
     client = _mock_client(_make_scoring_json(7))
     score_response(client, "Query?", "Response.")
 
     call_kwargs = client.invoke.call_args
     assert call_kwargs.kwargs["temperature"] == 0
-    assert call_kwargs.kwargs["max_tokens"] == 8000
+    assert call_kwargs.kwargs["max_tokens"] == 16000
 
 
 def test_score_response_uses_system_prompt():
@@ -147,8 +147,15 @@ def test_score_response_without_reference_answer():
 
 
 def test_score_response_invalid_json_raises():
-    """score_response must raise ValueError if LLM returns unparseable output."""
-    client = _mock_client("This is not JSON at all.")
+    """score_response must raise ValueError if both medium and disabled retries fail."""
+    # Both calls return unparseable text — medium attempt + disabled fallback
+    client = MagicMock()
+    bad_return = (
+        "This is not JSON at all.",
+        False,
+        {"input_tokens": 100, "output_tokens": 50, "total_tokens": 150},
+    )
+    client.invoke.return_value = bad_return
     with pytest.raises(ValueError):
         score_response(client, "Query?", "Response.")
 
@@ -167,6 +174,42 @@ def test_score_response_extra_criteria_in_prompt():
     messages = call_kwargs.kwargs["messages"]
     user_text = messages[0]["content"][0]["text"]
     assert "tone" in user_text
+
+
+def test_score_response_retries_with_disabled_on_parse_failure():
+    """If medium reasoning produces unparseable output, retry with disabled tier."""
+    valid_json = _make_scoring_json(7)
+    usage_dict = {"input_tokens": 100, "output_tokens": 50, "total_tokens": 150}
+
+    client = MagicMock()
+    # First call (medium) returns empty text; second call (disabled) returns valid JSON
+    client.invoke.side_effect = [
+        ("", False, usage_dict),          # medium — empty output, triggers fallback
+        (valid_json, False, usage_dict),  # disabled — valid JSON
+    ]
+
+    result, usage = score_response(client, "Query?", "Response.")
+
+    assert isinstance(result, ScoringResult)
+    assert result.avg_score() == pytest.approx(7.0)
+
+    # Verify two calls were made: first with medium, then with disabled
+    assert client.invoke.call_count == 2
+    first_call = client.invoke.call_args_list[0]
+    second_call = client.invoke.call_args_list[1]
+    assert first_call.kwargs["reasoning_tier"] == "medium"
+    assert first_call.kwargs["max_tokens"] == 16000
+    assert second_call.kwargs["reasoning_tier"] == "disabled"
+    assert second_call.kwargs["max_tokens"] == 4000
+
+
+def test_score_response_no_retry_on_success():
+    """If medium reasoning produces valid output, no retry should occur."""
+    client = _mock_client(_make_scoring_json(8))
+    result, _ = score_response(client, "Query?", "Response.")
+
+    assert isinstance(result, ScoringResult)
+    assert client.invoke.call_count == 1
 
 
 # ── _build_scoring_prompt helpers ─────────────────────────────────────────────

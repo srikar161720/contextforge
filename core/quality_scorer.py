@@ -5,7 +5,9 @@ Uses Amazon Nova with medium reasoning to score a model response against
 a set of quality criteria, returning a validated ScoringResult.
 
 Prompt templates are taken verbatim from context/prompt-templates.md.
-Call pattern: reasoning_tier="medium", temperature=0, max_tokens=8000.
+Call pattern: reasoning_tier="medium", temperature=0, max_tokens=16000.
+If medium reasoning consumes the entire output budget (producing empty/truncated
+JSON), the scorer retries once with reasoning_tier="disabled" as a fallback.
 
 Critical rules:
   - All Bedrock calls go through BedrockClient.invoke() — never call
@@ -106,7 +108,8 @@ def score_response(
 
     Raises:
         ValueError: If the LLM output cannot be parsed into a ScoringResult
-                    after all fallback strategies are exhausted.
+                    after all fallback strategies are exhausted (including the
+                    disabled-reasoning retry).
     """
     scoring_prompt = _build_scoring_prompt(
         query=query,
@@ -115,19 +118,41 @@ def score_response(
         criteria=criteria,
     )
 
-    # max_tokens=8000: medium reasoning tokens consume the output budget first,
-    # leaving too little room for the JSON output at 4000. 8000 gives ample
-    # headroom for both reasoning tokens and the ~200-token scoring JSON.
-    # See CLAUDE.md gotchas: "medium reasoning can consume entire output budget".
+    messages = [{"role": "user", "content": [{"text": scoring_prompt}]}]
+
+    # max_tokens=16000: medium reasoning tokens consume the output budget first.
+    # On large contexts (~200K+ tokens), medium reasoning can use 8000+ tokens,
+    # leaving nothing for the ~200-token scoring JSON.  16000 provides ample
+    # headroom.  See CLAUDE.md gotchas: "medium reasoning can consume entire
+    # output budget".
     text, _, usage = client.invoke(
         system=SCORING_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": [{"text": scoring_prompt}]}],
+        messages=messages,
         reasoning_tier="medium",
-        max_tokens=8000,
+        max_tokens=16000,
         temperature=0,
     )
 
-    result = parse_llm_json(text, ScoringResult)
+    try:
+        result = parse_llm_json(text, ScoringResult)
+    except ValueError:
+        # Medium reasoning consumed the output budget — retry once with
+        # reasoning disabled.  Same pattern as generate_demo_payload.py's
+        # _invoke_with_retry().
+        logger.warning(
+            "Medium reasoning produced unparseable output for query '%.60s...' "
+            "— retrying with reasoning_tier='disabled'.",
+            query,
+        )
+        text, _, usage = client.invoke(
+            system=SCORING_SYSTEM_PROMPT,
+            messages=messages,
+            reasoning_tier="disabled",
+            max_tokens=4000,
+            temperature=0,
+        )
+        result = parse_llm_json(text, ScoringResult)
+
     logger.debug(
         "Scored response for query '%s...' → avg=%.2f",
         query[:60],
