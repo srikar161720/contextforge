@@ -9,8 +9,6 @@ Critical rules:
   - detect_redundancy() is purely local — never calls the Bedrock API.
   - detect_redundancy_embeddings() is the ONE permitted use of invoke_model() in
     the codebase (embeddings model does not support the Converse API).
-
-See context/implementation-patterns.md for the reference implementation.
 """
 
 from __future__ import annotations

@@ -4,7 +4,6 @@ core/quality_scorer.py — LLM-as-judge response quality scoring.
 Uses Amazon Nova with medium reasoning to score a model response against
 a set of quality criteria, returning a validated ScoringResult.
 
-Prompt templates are taken verbatim from context/prompt-templates.md.
 Call pattern: reasoning_tier="medium", temperature=0, max_tokens=16000.
 If medium reasoning consumes the entire output budget (producing empty/truncated
 JSON), the scorer retries once with reasoning_tier="disabled" as a fallback.
@@ -27,7 +26,7 @@ from core.models import ScoringResult
 
 logger = logging.getLogger(__name__)
 
-# ── Prompt constants (from context/prompt-templates.md) ──────────────────────
+# ── Prompt constants ──────────────────────────────────────────────────────────
 
 SCORING_SYSTEM_PROMPT = """\
 You are a rigorous and consistent response quality evaluator. Your task is to score AI-generated responses against a set of quality criteria on a 1-10 integer scale.
@@ -123,8 +122,7 @@ def score_response(
     # max_tokens=16000: medium reasoning tokens consume the output budget first.
     # On large contexts (~200K+ tokens), medium reasoning can use 8000+ tokens,
     # leaving nothing for the ~200-token scoring JSON.  16000 provides ample
-    # headroom.  See CLAUDE.md gotchas: "medium reasoning can consume entire
-    # output budget".
+    # headroom.
     text, _, usage = client.invoke(
         system=SCORING_SYSTEM_PROMPT,
         messages=messages,

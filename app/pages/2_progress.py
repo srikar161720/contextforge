@@ -5,8 +5,6 @@ Launches the ablation sweep in a background daemon thread and polls the
 progress queue every 2 seconds via @st.fragment. Never calls st.* from
 the worker thread — all communication is via queue.Queue.
 
-Threading pattern follows context/implementation-patterns.md exactly.
-
 Session state written:
   - bedrock_client    (BedrockClient)
   - experiment_queue  (queue.Queue)

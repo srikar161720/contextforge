@@ -19,9 +19,6 @@ Critical rules:
   - Failures in Code Interpreter gracefully fall back to a local narrative.
   - plotly.io.to_html() is called with full_html=False, include_plotlyjs=False
     so the CDN <script> tag in the template loads Plotly once.
-
-See context/api-reference.md for Code Interpreter response block parsing.
-See context/architecture.md for the report generation role in the pipeline.
 """
 
 from __future__ import annotations

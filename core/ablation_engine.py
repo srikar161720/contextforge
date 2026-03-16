@@ -15,9 +15,6 @@ Critical rules:
   - Individual experiment failures are caught, logged, and skipped (not fatal).
   - Per-call token usage is tracked cumulatively via the client's own counters.
   - Progress is reported via queue.Queue — never via st.* from background threads.
-
-See context/architecture.md for the full pipeline design.
-See context/implementation-patterns.md for the Streamlit threading pattern.
 """
 
 from __future__ import annotations
@@ -249,7 +246,6 @@ def _send_progress(q: queue.Queue | None, msg: dict) -> None:
 
     Worker threads call this instead of st.* to comply with the Streamlit
     threading constraint (never call st.* from background threads).
-    See context/implementation-patterns.md for the threading pattern.
 
     Args:
         q:   Optional queue.Queue from st.session_state["experiment_queue"].

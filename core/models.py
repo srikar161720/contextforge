@@ -2,7 +2,6 @@
 core/models.py — Single source of truth for all Pydantic models.
 
 All modules import from here. Never define Pydantic models elsewhere.
-See context/data-models.md for full field documentation.
 """
 
 from enum import Enum

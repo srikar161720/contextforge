@@ -4,9 +4,6 @@ infra/json_parser.py — LLM JSON output parser with 4-strategy fallback chain.
 Always use parse_llm_json() to parse LLM responses. Never use raw json.loads()
 on model outputs — they frequently contain markdown fences, preambles, trailing
 commas, or other syntax issues that this module handles gracefully.
-
-See context/implementation-patterns.md for the reference implementation and
-test cases to cover in tests/test_json_parser.py.
 """
 
 import json

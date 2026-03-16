@@ -4,8 +4,6 @@ core/parser.py — Context payload parser and validator.
 Parses a JSON payload (file path or dict) into a validated ContextPayload.
 Recomputes token counts for all sections via tiktoken (user-provided values
 are always overwritten). Validates structural requirements before returning.
-
-See context/data-models.md for the expected input JSON schema.
 """
 
 from __future__ import annotations

@@ -5,9 +5,6 @@ All statistics are computed locally using numpy and scipy — no API calls.
 Provides section impact ranking, classification, confidence intervals,
 tier sensitivity scores, quality-per-token efficiency metrics, and Pareto
 frontier computation.
-
-See context/implementation-patterns.md for formulas and reference implementations.
-See context/data-models.md for SectionImpact and AblationResults field documentation.
 """
 
 from __future__ import annotations
@@ -26,7 +23,7 @@ from core.models import (
 
 logger = logging.getLogger(__name__)
 
-# ── Classification thresholds (from context/data-models.md) ──────────────────
+# ── Classification thresholds ─────────────────────────────────────────────────
 # Defaults are overridden by config.yaml thresholds when supplied by callers.
 _DEFAULT_IMPACT_LOW  = 0.5   # avg_delta below this → "removable"
 _DEFAULT_IMPACT_HIGH = 2.0   # avg_delta at or above this → "essential"
@@ -241,7 +238,7 @@ def _classify(
 ) -> str:
     """Map an average quality delta to a section classification string.
 
-    Thresholds from context/data-models.md:
+    Thresholds:
       - harmful:   avg_delta < 0                          (removing improves quality)
       - removable: 0 ≤ avg_delta < impact_low             (minimal impact, safe to remove)
       - moderate:  impact_low ≤ avg_delta < impact_high   (context-dependent)

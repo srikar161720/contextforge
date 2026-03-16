@@ -4,8 +4,6 @@ infra/rate_limiter.py — Adaptive RPM + TPM rate limiter.
 Uses sliding 60-second windows to enforce requests-per-minute and
 tokens-per-minute limits. Instantiated once by BedrockClient and shared
 across all API calls.
-
-See context/implementation-patterns.md for the reference implementation.
 """
 
 import time

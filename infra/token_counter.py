@@ -4,9 +4,6 @@ infra/token_counter.py — Token counting utilities.
 Two distinct token sources are used throughout ContextForge:
   - tiktoken (cl100k_base): Pre-flight estimates for rate limiting and UI display.
   - API-reported usage:     Authoritative counts used in all reports and cost calculations.
-
-Never use tiktoken counts in cost reports. See context/data-models.md for the
-token counting convention.
 """
 
 import tiktoken

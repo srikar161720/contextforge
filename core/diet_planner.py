@@ -10,9 +10,6 @@ Critical rules:
   - HIGH tier: do NOT pass max_tokens, temperature, topP, or topK.
     Passing any of these raises ValidationException.
   - All Bedrock calls go through BedrockClient.invoke().
-
-See context/prompt-templates.md for the full prompt template.
-See context/architecture.md for the role of the diet planner in the pipeline.
 """
 
 from __future__ import annotations
@@ -24,12 +21,12 @@ from infra.bedrock_client import BedrockClient
 
 logger = logging.getLogger(__name__)
 
-# ── Pricing constants (from context/api-reference.md) ────────────────────────
+# ── Pricing constants ────────────────────────────────────────────────────────
 _INPUT_PRICE_PER_M  = 0.30   # USD per 1M input tokens
 _OUTPUT_PRICE_PER_M = 2.50   # USD per 1M output tokens (includes reasoning)
 
 
-# ── Prompt templates (from context/prompt-templates.md) ──────────────────────
+# ── Prompt templates ─────────────────────────────────────────────────────────
 
 _DIET_PLANNER_SYSTEM_PROMPT = """\
 You are an expert LLM context engineering consultant. You analyze the results of \

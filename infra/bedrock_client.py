@@ -9,9 +9,6 @@ Critical rules enforced here:
   - HIGH reasoning tier: inferenceConfig is omitted entirely (no temperature/topP/maxTokens)
   - Reasoning content is [REDACTED]; only its presence is checked, never parsed
   - Every call goes through rate limiting and retry logic
-
-See context/api-reference.md and context/implementation-patterns.md for the
-reference implementation and API call shape.
 """
 
 from __future__ import annotations

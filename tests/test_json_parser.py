@@ -3,8 +3,6 @@ tests/test_json_parser.py — Unit tests for infra/json_parser.py.
 
 Tests the 4-strategy fallback chain against all documented edge cases.
 No Bedrock API calls — purely local parsing logic.
-
-See context/implementation-patterns.md (lines 203-211) for the required test cases.
 """
 
 import pytest

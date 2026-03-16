@@ -7,9 +7,6 @@ Converts a list of ContextSection objects into Converse API parameters
 Supports:
   - Ablation: exclude sections by ID via exclude_ids
   - Custom ordering: reorder non-system sections via an ordered list of IDs
-
-See context/implementation-patterns.md for the reference implementation
-and section tag format.
 """
 
 from __future__ import annotations

@@ -4,7 +4,7 @@ tests/test_day1_validation.py — Day 1 integration tests against live Bedrock A
 All tests are marked @pytest.mark.integration and require valid AWS credentials
 in the .env file. They are skipped automatically when credentials are absent.
 
-Tests validate the Bedrock client setup as specified in PROGRESS.md (Phase 1):
+Tests validate the Bedrock client setup:
   1. Basic Converse API call succeeds
   2. Extended thinking (medium) returns a reasoningContent block
   3. Code Interpreter returns toolUse/toolResult blocks
@@ -12,8 +12,6 @@ Tests validate the Bedrock client setup as specified in PROGRESS.md (Phase 1):
   5. Usage reporting — inputTokens/outputTokens populated
   6. Large context (~200K tokens) succeeds without timeout
   7. Rate limit validation — RPM=200 / TPM=8M confirmed at runtime
-
-Record test 4 result (compatibility matrix) in PROGRESS.md session log.
 """
 
 import pytest
@@ -106,11 +104,6 @@ def test_extended_thinking_and_code_interpreter_compatibility(
 ):
     """
     Compatibility discovery: extended thinking (medium) + Code Interpreter simultaneously.
-
-    Per context/api-reference.md: "Confirmed compatible — response will contain
-    reasoningContent, toolUse, toolResult, and text blocks together."
-
-    Record result (PASS/FAIL) in PROGRESS.md session log.
     """
     blocks, usage = bedrock_client.invoke_raw(
         system=None,
