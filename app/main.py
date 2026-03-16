@@ -40,19 +40,32 @@ apply_layout()
 
 # ── Main page — branding hero ────────────────────────────────────────────────
 
+_img_col1, _img_col2, _img_col3 = st.columns([1, 8, 1])
+with _img_col2:
+    st.image(
+        str(Path(__file__).resolve().parent / "assets" / "content.jpg"),
+        width=760,
+    )
+
 st.markdown(
     """
-    <div style="text-align:center; padding: 2.5rem 1rem 1.5rem 1rem;">
-        <span style="font-size:3rem;">🔬</span>
-        <h1 style="margin:0.4rem 0 0.2rem 0; font-size:2rem;
-                   color:#1f2937; font-weight:700;">
+    <div style="max-width:980px; margin:0 auto; text-align:center; padding: 1.3rem 1rem 0.9rem 1rem;">
+        <div style="margin:0.2rem 0 0.25rem 0; font-size:3.35rem; color:#1f2937; font-weight:700; line-height:1.1;">
             ContextForge
-        </h1>
-        <p style="font-size:0.95rem; color:#6b7280; margin:0.2rem 0 0.8rem 0;">
+        </div>
+        <p style="font-size:1.28rem; color:#6b7280; margin:0.3rem 0 1rem 0; font-weight:500;">
             LLM Context Ablation Testing
         </p>
-        <p style="font-size:0.88rem; color:#4b5563; max-width:600px;
-                  margin:0 auto 1.5rem auto; line-height:1.6;">
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.markdown(
+    """
+    <div style="max-width:980px; margin:0 auto; text-align:center; padding: 0.9rem 1rem 1.8rem 1rem;">
+        <p style="font-size:1.04rem; color:#4b5563; max-width:760px;
+                  margin:0 auto 1.9rem auto; line-height:1.7;">
             Systematically remove context sections from your LLM payloads,
             measure quality impact via LLM-as-judge scoring, and get
             optimization recommendations with cost savings projections &mdash;

@@ -15,6 +15,7 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 
 from core.ablation_engine import (
+    ExperimentCancelled,
     check_interaction_effects,
     compute_quality_delta,
     run_baseline,
@@ -585,7 +586,7 @@ def test_greedy_elimination_candidates_sorted_by_token_count():
 
     calls_order: list[str] = []
 
-    def _mock_excl(client, payload, exclude_ids, tiers, num_queries=None):
+    def _mock_excl(client, payload, exclude_ids, tiers, num_queries=None, cancel_event=None):
         # Record which section was in the tentative excluded set for this call
         calls_order.append(str(sorted(exclude_ids)))
         return {"disabled": {0: _scoring_result(8)}}
@@ -951,3 +952,85 @@ def test_full_sweep_with_ordering_populates_recommendations():
     for rec in result.ordering_recommendations:
         assert "section_id" in rec
         assert "best_position" in rec
+
+
+# ── Cancellation tests ────────────────────────────────────────────────────────
+
+
+def test_run_full_sweep_cancel_before_start():
+    """Pre-set cancel event raises ExperimentCancelled immediately."""
+    import threading
+
+    payload = _make_minimal_payload_3q()
+    config  = _make_demo_config()
+    cancel  = threading.Event()
+    cancel.set()  # Already cancelled before sweep starts
+
+    with patch("core.ablation_engine.score_response") as mock_score:
+        mock_score.return_value = (
+            _scoring_result(7),
+            {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15},
+        )
+        client = _patched_sweep_client()
+        client.invoke.return_value = (
+            "Response.", False,
+            {"input_tokens": 100, "output_tokens": 50, "total_tokens": 150},
+        )
+
+        with pytest.raises(ExperimentCancelled):
+            run_full_sweep(client, payload, config, cancel_event=cancel)
+
+
+def test_run_full_sweep_cancel_during_sweep():
+    """Setting cancel event mid-sweep raises ExperimentCancelled and stops processing."""
+    import threading
+
+    payload = _make_minimal_payload_3q()
+    config  = _make_demo_config()
+    cancel  = threading.Event()
+
+    call_count = {"n": 0}
+
+    def _counting_score(*args, **kwargs):
+        call_count["n"] += 1
+        # Cancel after 2 scoring calls (during first section ablation)
+        if call_count["n"] >= 2:
+            cancel.set()
+        return (
+            _scoring_result(7),
+            {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15},
+        )
+
+    with patch("core.ablation_engine.score_response", side_effect=_counting_score):
+        client = _patched_sweep_client()
+        client.invoke.return_value = (
+            "Response.", False,
+            {"input_tokens": 100, "output_tokens": 50, "total_tokens": 150},
+        )
+
+        with pytest.raises(ExperimentCancelled):
+            run_full_sweep(client, payload, config, cancel_event=cancel)
+
+    # Should have stopped early — fewer calls than a full sweep
+    assert call_count["n"] < 20
+
+
+def test_run_full_sweep_none_cancel_event_is_safe():
+    """cancel_event=None (default) should not affect normal execution."""
+    payload = _make_minimal_payload_3q()
+    config  = _make_demo_config()
+
+    with patch("core.ablation_engine.score_response") as mock_score:
+        mock_score.return_value = (
+            _scoring_result(7),
+            {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15},
+        )
+        client = _patched_sweep_client()
+        client.invoke.return_value = (
+            "Response.", False,
+            {"input_tokens": 100, "output_tokens": 50, "total_tokens": 150},
+        )
+
+        result = run_full_sweep(client, payload, config, cancel_event=None)
+
+    assert isinstance(result, AblationResults)

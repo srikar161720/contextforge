@@ -96,6 +96,12 @@ html, body, .stApp {
     transform: translateY(-1px);
 }
 
+/* ── Cancel button (red gradient) ── */
+.st-key-cancel-section .stButton > button {
+    background: linear-gradient(135deg, #ef4444 0%, #f97316 100%) !important;
+    box-shadow: 0 2px 6px rgba(239,68,68,0.35) !important;
+}
+
 /* ── Expanders ── */
 [data-testid="stExpander"] {
     border: 1px solid #e5e7eb;

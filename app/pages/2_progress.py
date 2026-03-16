@@ -18,12 +18,12 @@ from __future__ import annotations
 
 import time
 from queue import Empty, Queue
-from threading import Thread
+from threading import Event, Thread
 
 import streamlit as st
 
 from app.components.layout import apply_layout
-from core.ablation_engine import run_full_sweep
+from core.ablation_engine import ExperimentCancelled, run_full_sweep
 from infra.bedrock_client import BedrockClient
 
 apply_layout()
@@ -36,6 +36,7 @@ def _ablation_worker(
     payload,
     config,
     result_queue: Queue,
+    cancel_event: Event,
 ) -> None:
     """Execute the full ablation sweep and post results to the queue.
 
@@ -49,8 +50,11 @@ def _ablation_worker(
             payload=payload,
             config=config,
             progress_queue=result_queue,
+            cancel_event=cancel_event,
         )
         result_queue.put({"type": "final_results", "data": results})
+    except ExperimentCancelled:
+        result_queue.put({"type": "cancelled"})
     except Exception as exc:  # noqa: BLE001
         result_queue.put({"type": "fatal", "error": str(exc)})
 
@@ -69,6 +73,7 @@ def _init_state() -> None:
         "bedrock_client":      None,
         "_exp_start_time":     None,
         "_exp_errors":         [],
+        "_cancel_event":       None,
     }
     for key, val in defaults.items():
         if key not in st.session_state:
@@ -122,16 +127,18 @@ if not st.session_state["experiment_running"] and st.session_state["ablation_res
 
     # Fresh queue and state for this run
     result_queue = Queue()
+    cancel_event = Event()
     st.session_state["experiment_queue"]    = result_queue
     st.session_state["experiment_running"]  = True
     st.session_state["experiment_phase"]    = "Starting…"
     st.session_state["experiment_progress"] = {"completed": 0, "total": 0, "errors": 0}
     st.session_state["_exp_start_time"]     = time.monotonic()
     st.session_state["_exp_errors"]         = []
+    st.session_state["_cancel_event"]       = cancel_event
 
     Thread(
         target=_ablation_worker,
-        args=(client, payload, config, result_queue),
+        args=(client, payload, config, result_queue, cancel_event),
         daemon=True,
     ).start()
 
@@ -225,6 +232,12 @@ def _handle_message(msg: dict) -> None:
         st.session_state["experiment_running"] = False
         st.session_state["experiment_phase"]   = "Complete ✅"
 
+    elif msg_type == "cancelled":
+        st.session_state["experiment_running"] = False
+        st.session_state["experiment_phase"]   = "Cancelled"
+        # Clear experiment config so the auto-launch guard prevents restart
+        st.session_state.pop("experiment_config", None)
+
     elif msg_type == "fatal":
         st.session_state["experiment_running"] = False
         st.session_state["experiment_phase"]   = f"Failed ❌: {msg.get('error', 'unknown error')}"
@@ -308,3 +321,25 @@ def _render_progress_ui() -> None:
 
 
 _progress_display()
+
+# ── Cancel button (outside fragment so CSS works at page level) ──────────────
+
+if st.session_state["experiment_running"]:
+    _, center, _ = st.columns([1, 2, 1])
+    with center:
+        with st.container(key="cancel-section"):
+            if st.button("Cancel Experiment", key="cancel_btn", use_container_width=True):
+                # Signal the worker thread to stop
+                cancel_ev = st.session_state.get("_cancel_event")
+                if cancel_ev is not None:
+                    cancel_ev.set()
+                # Clear experiment state so auto-launch guard prevents restart
+                st.session_state["experiment_running"] = False
+                st.session_state.pop("experiment_config", None)
+                for key in (
+                    "experiment_queue", "experiment_phase",
+                    "experiment_progress", "bedrock_client",
+                    "_exp_start_time", "_exp_errors", "_cancel_event",
+                ):
+                    st.session_state.pop(key, None)
+                st.rerun()

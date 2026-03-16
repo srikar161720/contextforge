@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import logging
 import queue
+import threading
 from pathlib import Path
 
 import numpy as np
@@ -46,6 +47,17 @@ from infra.bedrock_client import BedrockClient
 
 logger = logging.getLogger(__name__)
 
+
+class ExperimentCancelled(Exception):
+    """Raised when the user cancels a running experiment."""
+
+
+def _check_cancelled(cancel_event: threading.Event | None) -> None:
+    """Raise ExperimentCancelled if the cancel event is set."""
+    if cancel_event is not None and cancel_event.is_set():
+        raise ExperimentCancelled("Experiment cancelled by user.")
+
+
 # Max tokens for the response generation call (not scoring).
 # 4096 gives Nova room for a substantive answer on large contexts.
 _RESPONSE_MAX_TOKENS = 4096
@@ -62,6 +74,7 @@ def run_baseline(
     payload: ContextPayload,
     tiers: list[str],
     num_queries: int | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> dict[str, dict[int, ScoringResult]]:
     """Run baseline evaluation: full context, across all specified tiers and queries.
 
@@ -86,6 +99,7 @@ def run_baseline(
     for tier in tiers:
         scores[tier] = {}
         for q_idx, eval_query in enumerate(queries):
+            _check_cancelled(cancel_event)
             try:
                 api_params = assemble_api_call(payload.sections, eval_query.query)
                 response_text, _, _usage = client.invoke(
@@ -94,6 +108,7 @@ def run_baseline(
                     reasoning_tier=tier,
                     max_tokens=_RESPONSE_MAX_TOKENS,
                 )
+                _check_cancelled(cancel_event)
                 result, _score_usage = score_response(
                     client=client,
                     query=eval_query.query,
@@ -106,6 +121,8 @@ def run_baseline(
                     "Baseline [tier=%s, query=%d] avg=%.2f",
                     tier, q_idx, result.avg_score(),
                 )
+            except ExperimentCancelled:
+                raise
             except Exception as exc:  # noqa: BLE001
                 logger.warning(
                     "Baseline experiment failed [tier=%s, query=%d]: %s",
@@ -121,6 +138,7 @@ def run_single_ablation(
     section_id: str,
     tiers: list[str],
     num_queries: int | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> dict[str, dict[int, ScoringResult]]:
     """Run ablation with one section excluded, across all tiers and queries.
 
@@ -144,6 +162,7 @@ def run_single_ablation(
     for tier in tiers:
         scores[tier] = {}
         for q_idx, eval_query in enumerate(queries):
+            _check_cancelled(cancel_event)
             try:
                 api_params = assemble_api_call(
                     payload.sections,
@@ -156,6 +175,7 @@ def run_single_ablation(
                     reasoning_tier=tier,
                     max_tokens=_RESPONSE_MAX_TOKENS,
                 )
+                _check_cancelled(cancel_event)
                 result, _score_usage = score_response(
                     client=client,
                     query=eval_query.query,
@@ -168,6 +188,8 @@ def run_single_ablation(
                     "Ablation [section=%s, tier=%s, query=%d] avg=%.2f",
                     section_id, tier, q_idx, result.avg_score(),
                 )
+            except ExperimentCancelled:
+                raise
             except Exception as exc:  # noqa: BLE001
                 logger.warning(
                     "Ablation experiment failed [section=%s, tier=%s, query=%d]: %s",
@@ -259,11 +281,12 @@ def _send_progress(q: queue.Queue | None, msg: dict) -> None:
 
 
 def _run_multi_exclusion(
-    client:      BedrockClient,
-    payload:     ContextPayload,
-    exclude_ids: set[str],
-    tiers:       list[str],
-    num_queries: int | None = None,
+    client:       BedrockClient,
+    payload:      ContextPayload,
+    exclude_ids:  set[str],
+    tiers:        list[str],
+    num_queries:  int | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> dict[str, dict[int, ScoringResult]]:
     """Score the context with an arbitrary set of sections excluded.
 
@@ -272,11 +295,12 @@ def _run_multi_exclusion(
     accepts exclude_ids as a set[str].
 
     Args:
-        client:      BedrockClient instance.
-        payload:     Full context payload.
-        exclude_ids: Set of section IDs to omit from every assembled context.
-        tiers:       Reasoning tiers to evaluate.
-        num_queries: Max queries to use. None = use all.
+        client:       BedrockClient instance.
+        payload:      Full context payload.
+        exclude_ids:  Set of section IDs to omit from every assembled context.
+        tiers:        Reasoning tiers to evaluate.
+        num_queries:  Max queries to use. None = use all.
+        cancel_event: Optional threading.Event for cancellation.
 
     Returns:
         {tier: {query_idx: ScoringResult}} for the reduced configuration.
@@ -287,6 +311,7 @@ def _run_multi_exclusion(
     for tier in tiers:
         scores[tier] = {}
         for q_idx, eval_query in enumerate(queries):
+            _check_cancelled(cancel_event)
             try:
                 api_params = assemble_api_call(
                     payload.sections,
@@ -299,6 +324,7 @@ def _run_multi_exclusion(
                     reasoning_tier=tier,
                     max_tokens=_RESPONSE_MAX_TOKENS,
                 )
+                _check_cancelled(cancel_event)
                 result, _score_usage = score_response(
                     client=client,
                     query=eval_query.query,
@@ -307,6 +333,8 @@ def _run_multi_exclusion(
                     criteria=payload.quality_criteria,
                 )
                 scores[tier][q_idx] = result
+            except ExperimentCancelled:
+                raise
             except Exception as exc:  # noqa: BLE001
                 logger.warning(
                     "Multi-exclusion failed [exclude=%s, tier=%s, query=%d]: %s",
@@ -324,6 +352,7 @@ def run_full_sweep(
     payload:        ContextPayload,
     config:         ExperimentConfig,
     progress_queue: queue.Queue | None = None,
+    cancel_event:   threading.Event | None = None,
 ) -> AblationResults:
     """Orchestrate a full ablation sweep and return assembled AblationResults.
 
@@ -365,7 +394,8 @@ def run_full_sweep(
     # ── 1. Baseline ───────────────────────────────────────────────────────────
     baseline_all_reps: list[dict[str, dict[int, ScoringResult]]] = []
     for rep in range(repetitions):
-        rep_scores = run_baseline(client, payload, tiers=tiers, num_queries=num_queries)
+        _check_cancelled(cancel_event)
+        rep_scores = run_baseline(client, payload, tiers=tiers, num_queries=num_queries, cancel_event=cancel_event)
         baseline_all_reps.append(rep_scores)
         _send_progress(
             progress_queue,
@@ -383,6 +413,7 @@ def run_full_sweep(
     section_ablation_scores: dict[str, dict[str, dict[int, ScoringResult]]] = {}
 
     for s_idx, section in enumerate(payload.sections):
+        _check_cancelled(cancel_event)
         ablation_reps: list[dict[str, dict[int, ScoringResult]]] = []
         for rep in range(repetitions):
             try:
@@ -392,8 +423,11 @@ def run_full_sweep(
                     section_id=section.id,
                     tiers=tiers,
                     num_queries=num_queries,
+                    cancel_event=cancel_event,
                 )
                 ablation_reps.append(rep_ablated)
+            except ExperimentCancelled:
+                raise
             except Exception as exc:  # noqa: BLE001
                 logger.warning(
                     "Full sweep: ablation failed [section=%s, rep=%d]: %s",
@@ -442,6 +476,7 @@ def run_full_sweep(
     )
 
     # ── 5. Lean configuration ─────────────────────────────────────────────────
+    _check_cancelled(cancel_event)
     if run_multi and section_impacts:
         lean_config, lean_retention, lean_reduction = run_greedy_elimination(
             client=client,
@@ -450,6 +485,7 @@ def run_full_sweep(
             config=config,
             baseline_scores=baseline_scores,
             progress_queue=progress_queue,
+            cancel_event=cancel_event,
         )
     else:
         # Demo mode (run_multi_section=false): derive lean config from impact
@@ -468,6 +504,7 @@ def run_full_sweep(
 
     # ── 7. Ordering experiments (Full mode only) ──────────────────────────────
     ordering_recs: list[dict] = []
+    _check_cancelled(cancel_event)
     if run_ordering and section_impacts:
         ordering_recs = run_ordering_experiments(
             client=client,
@@ -476,6 +513,7 @@ def run_full_sweep(
             config=config,
             baseline_scores=baseline_scores,
             progress_queue=progress_queue,
+            cancel_event=cancel_event,
         )
 
     # ── 8. Assemble AblationResults ───────────────────────────────────────────
@@ -508,6 +546,7 @@ def run_ordering_experiments(
     baseline_scores: dict[str, dict[int, ScoringResult]],
     progress_queue:  queue.Queue | None = None,
     top_n:           int = 5,
+    cancel_event:    threading.Event | None = None,
 ) -> list[dict]:
     """Test the effect of section ordering on response quality.
 
@@ -580,6 +619,7 @@ def run_ordering_experiments(
     )
 
     for cand_idx, cand in enumerate(candidates):
+        _check_cancelled(cancel_event)
         section_id = cand.section_id
         position_deltas: dict[str, float] = {}
 
@@ -606,6 +646,7 @@ def run_ordering_experiments(
             for tier in tiers:
                 pos_scores[tier] = {}
                 for q_idx, eval_query in enumerate(queries):
+                    _check_cancelled(cancel_event)
                     try:
                         api_params = assemble_api_call(
                             payload.sections,
@@ -618,6 +659,7 @@ def run_ordering_experiments(
                             reasoning_tier=tier,
                             max_tokens=_RESPONSE_MAX_TOKENS,
                         )
+                        _check_cancelled(cancel_event)
                         score_result, _score_usage = score_response(
                             client=client,
                             query=eval_query.query,
@@ -630,6 +672,8 @@ def run_ordering_experiments(
                             "Ordering [section=%s, pos=%s, tier=%s, q=%d] avg=%.2f",
                             section_id, pos_name, tier, q_idx, score_result.avg_score(),
                         )
+                    except ExperimentCancelled:
+                        raise
                     except Exception as exc:  # noqa: BLE001
                         logger.warning(
                             "Ordering experiment failed [section=%s, pos=%s, tier=%s, q=%d]: %s",
@@ -682,6 +726,7 @@ def run_greedy_elimination(
     config:          ExperimentConfig,
     baseline_scores: dict[str, dict[int, ScoringResult]],
     progress_queue:  queue.Queue | None = None,
+    cancel_event:    threading.Event | None = None,
 ) -> tuple[list[str], float, float]:
     """Greedy backward elimination to find a lean context configuration.
 
@@ -725,6 +770,7 @@ def run_greedy_elimination(
     )
 
     for cand in candidates:
+        _check_cancelled(cancel_event)
         tentative = excluded_ids | {cand.section_id}
         try:
             lean_scores      = _run_multi_exclusion(
@@ -733,6 +779,7 @@ def run_greedy_elimination(
                 exclude_ids=tentative,
                 tiers=tiers,
                 num_queries=num_queries,
+                cancel_event=cancel_event,
             )
             lean_quality     = _compute_avg(lean_scores)
             quality_loss_pct = (
@@ -750,6 +797,8 @@ def run_greedy_elimination(
                     "Greedy: rejected removal of '%s' (loss=%.3f > tol=%.3f)",
                     cand.section_id, quality_loss_pct, config.quality_tolerance,
                 )
+        except ExperimentCancelled:
+            raise
         except Exception as exc:  # noqa: BLE001
             logger.warning(
                 "Greedy: evaluation failed for '%s': %s — skipping.",
@@ -771,8 +820,11 @@ def run_greedy_elimination(
                 exclude_ids=excluded_ids,
                 tiers=tiers,
                 num_queries=num_queries,
+                cancel_event=cancel_event,
             )
             lean_quality = _compute_avg(final_scores)
+        except ExperimentCancelled:
+            raise
         except Exception as exc:  # noqa: BLE001
             logger.warning("Greedy: final lean evaluation failed: %s", exc)
             lean_quality = baseline_quality * (1.0 - lean_reduction)
