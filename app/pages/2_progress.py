@@ -24,8 +24,11 @@ from threading import Thread
 
 import streamlit as st
 
+from app.components.layout import apply_layout
 from core.ablation_engine import run_full_sweep
 from infra.bedrock_client import BedrockClient
+
+apply_layout()
 
 # ── Worker (background thread — NO st.* calls here) ──────────────────────────
 

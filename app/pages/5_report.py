@@ -25,7 +25,10 @@ from __future__ import annotations
 import streamlit as st
 import streamlit.components.v1 as components
 
+from app.components.layout import apply_layout
 from core.report_generator import generate_report
+
+apply_layout()
 
 # ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -47,9 +50,9 @@ experiment_mode  = experiment_config.mode.value if experiment_config else "demo"
 
 missing = []
 if results is None:
-    missing.append("ablation results (run an experiment)")
+    missing.append("Ablation Results (run an experiment)")
 if payload is None:
-    missing.append("context payload (upload a payload)")
+    missing.append("Context Payload (upload a payload)")
 if diet_plan is None:
     missing.append("Context Diet Plan (visit the Diet Plan page)")
 
@@ -60,14 +63,14 @@ if missing:
     )
     nav_cols = st.columns(len(missing))
     page_map = {
-        "ablation results (run an experiment)":              "pages/2_progress.py",
-        "context payload (upload a payload)":                "pages/1_upload.py",
+        "Ablation Results (run an experiment)":              "pages/2_progress.py",
+        "Context Payload (upload a payload)":                "pages/1_upload.py",
         "Context Diet Plan (visit the Diet Plan page)":      "pages/4_diet_plan.py",
     }
     for col, m in zip(nav_cols, missing):
         with col:
             target = page_map.get(m, "pages/1_upload.py")
-            label  = m.split("(")[0].strip().capitalize()
+            label  = m.split("(")[0].strip().title()
             if st.button(f"→ {label}", use_container_width=True):
                 st.switch_page(target)
     st.stop()

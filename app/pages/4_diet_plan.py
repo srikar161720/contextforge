@@ -18,7 +18,10 @@ from __future__ import annotations
 
 import streamlit as st
 
+from app.components.layout import apply_layout
 from core.diet_planner import generate_diet_plan
+
+apply_layout()
 
 # ── Page ──────────────────────────────────────────────────────────────────────
 

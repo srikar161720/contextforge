@@ -17,9 +17,12 @@ import streamlit as st
 
 from app.components.heatmap import render_heatmap
 from app.components.impact_chart import render_impact_chart
+from app.components.layout import apply_layout
 from app.components.pareto_chart import render_pareto_chart
 from app.components.tier_radar import render_tier_radar
 from core.models import AblationResults
+
+apply_layout()
 
 # ── Classification colours (pastel, matching the design system) ───────────────
 _CLS_COLORS: dict[str, tuple[str, str]] = {

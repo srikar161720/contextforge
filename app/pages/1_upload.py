@@ -22,8 +22,11 @@ from collections import Counter
 import streamlit as st
 
 from app.components.context_viewer import render_context_viewer
+from app.components.layout import apply_layout
 from core.models import ExperimentConfig, ExperimentMode
 from core.parser import parse_payload
+
+apply_layout()
 
 # ── Mode metadata shown in the UI ─────────────────────────────────────────────
 
@@ -230,9 +233,6 @@ with st.expander("⚙️ Advanced Settings", expanded=False):
             "Lower = more pairs detected; higher = only very similar pairs flagged."
         ),
     )
-else:
-    quality_tolerance    = 0.05
-    redundancy_threshold = 0.70
 
 # ── Start experiment button ───────────────────────────────────────────────────
 
