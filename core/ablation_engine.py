@@ -1,5 +1,5 @@
 """
-core/ablation_engine.py — Ablation experiment orchestrator (Phase 3 + Phase 4).
+core/ablation_engine.py — Ablation experiment orchestrator (Phase 3 + Phase 4 + Phase 5).
 
 Provides the full ablation pipeline:
   1. Baseline evaluation — score model responses on the full context.
@@ -8,6 +8,7 @@ Provides the full ablation pipeline:
   4. Full sweep — baseline + single-section ablation for every section.
   5. Greedy backward elimination — find a lean multi-section configuration.
   6. Interaction effects check — compare predicted vs. measured lean quality.
+  7. Ordering experiments — test top-N sections at 3 positions (Phase 5).
 
 Critical rules:
   - All Bedrock calls go through BedrockClient.invoke() — never directly.
@@ -352,12 +353,13 @@ def run_full_sweep(
     Returns:
         Fully populated AblationResults.
     """
-    mode_cfg    = _get_mode_config(config.mode.value)
-    thresholds  = _load_thresholds()
-    tiers       = config.reasoning_tiers
-    num_queries = mode_cfg.get("num_queries")
-    repetitions = config.repetitions
-    run_multi   = mode_cfg.get("run_multi_section", False)
+    mode_cfg       = _get_mode_config(config.mode.value)
+    thresholds     = _load_thresholds()
+    tiers          = config.reasoning_tiers
+    num_queries    = mode_cfg.get("num_queries")
+    repetitions    = config.repetitions
+    run_multi      = mode_cfg.get("run_multi_section", False)
+    run_ordering   = mode_cfg.get("run_ordering", False)
 
     n_sections  = len(payload.sections)
     # Total progress steps: (1 baseline + n_sections ablations) × repetitions
@@ -468,7 +470,19 @@ def run_full_sweep(
     pareto_configs   = build_pareto_candidates(payload, section_impacts, baseline_quality)
     pareto_frontier  = compute_pareto_frontier(pareto_configs)
 
-    # ── 7. Assemble AblationResults ───────────────────────────────────────────
+    # ── 7. Ordering experiments (Full mode only) ──────────────────────────────
+    ordering_recs: list[dict] = []
+    if run_ordering and section_impacts:
+        ordering_recs = run_ordering_experiments(
+            client=client,
+            payload=payload,
+            impacts=section_impacts,
+            config=config,
+            baseline_scores=baseline_scores,
+            progress_queue=progress_queue,
+        )
+
+    # ── 8. Assemble AblationResults ───────────────────────────────────────────
     _send_progress(progress_queue, {"type": "done"})
 
     return AblationResults(
@@ -477,7 +491,7 @@ def run_full_sweep(
         lean_configuration=lean_config,
         lean_quality_retention=lean_retention,
         lean_token_reduction=lean_reduction,
-        ordering_recommendations=[],     # Populated in Phase 5 (ordering experiments)
+        ordering_recommendations=ordering_recs,
         redundancy_clusters=redundancy_clusters,
         pareto_configurations=pareto_frontier,
         total_api_calls=client.total_api_calls,
@@ -485,6 +499,181 @@ def run_full_sweep(
         total_output_tokens=client.total_output_tokens,
         total_cost=client.total_cost,
     )
+
+
+# ── Phase 5: ordering experiments ────────────────────────────────────────────
+
+
+def run_ordering_experiments(
+    client:          BedrockClient,
+    payload:         ContextPayload,
+    impacts:         list[SectionImpact],
+    config:          ExperimentConfig,
+    baseline_scores: dict[str, dict[int, ScoringResult]],
+    progress_queue:  queue.Queue | None = None,
+    top_n:           int = 5,
+) -> list[dict]:
+    """Test the effect of section ordering on response quality.
+
+    For the top ``top_n`` non-system sections by avg_quality_delta, evaluates
+    placing each section at 3 positions (start, middle, end) of the non-system
+    section list and measures quality delta relative to baseline at each position.
+
+    Only system_prompt sections are excluded from ordering candidates because
+    they are always routed to the Converse API ``system`` field by the assembler
+    and cannot be repositioned.
+
+    API cost: top_n × 3 positions × num_queries calls (uses first tier only).
+
+    Args:
+        client:          BedrockClient instance.
+        payload:         Full context payload.
+        impacts:         Ranked SectionImpact list (from rank_sections).
+        config:          ExperimentConfig with reasoning_tiers and quality_tolerance.
+        baseline_scores: {tier: {q_idx: ScoringResult}} from run_baseline().
+        progress_queue:  Optional Queue for Streamlit progress reporting.
+        top_n:           Number of top sections to test (default 5).
+
+    Returns:
+        List of ordering result dicts, one per candidate section::
+
+            [
+                {
+                    "section_id":    str,
+                    "label":         str,
+                    "best_position": str,   # "start" | "middle" | "end"
+                    "quality_deltas": {     # delta vs. baseline per position
+                        "start":  float,
+                        "middle": float,
+                        "end":    float,
+                    },
+                    "quality_gain": float,  # best delta minus worst delta
+                },
+                ...
+            ]
+    """
+    mode_cfg    = _get_mode_config(config.mode.value)
+    num_queries = mode_cfg.get("num_queries")
+    # Use only the first tier to minimise ordering experiment API cost.
+    tiers       = config.reasoning_tiers[:1]
+
+    # Non-system sections in their original payload order — these are reorderable.
+    from core.models import SectionType  # local import to avoid circular at module level
+    non_system_ids = [
+        s.id for s in payload.sections
+        if s.section_type != SectionType.SYSTEM_PROMPT
+    ]
+    n_non_sys = len(non_system_ids)
+
+    # Candidates: top_n ranked non-system sections by avg_quality_delta.
+    candidates = [
+        imp for imp in impacts
+        if imp.section_type != SectionType.SYSTEM_PROMPT.value
+    ][:top_n]
+
+    if not candidates:
+        logger.info("Ordering experiments: no non-system candidates found — skipping.")
+        return []
+
+    baseline_quality = _compute_avg(baseline_scores)
+    results: list[dict] = []
+
+    _send_progress(
+        progress_queue,
+        {"type": "ordering_start", "candidates": len(candidates)},
+    )
+
+    for cand_idx, cand in enumerate(candidates):
+        section_id = cand.section_id
+        position_deltas: dict[str, float] = {}
+
+        # Build the 3 orderings: place section at start, middle, or end of
+        # the non-system section list. Remaining sections keep their original
+        # relative order.
+        remaining_ids = [sid for sid in non_system_ids if sid != section_id]
+        mid_idx       = max(0, n_non_sys // 2 - 1)
+
+        positions: dict[str, list[str]] = {
+            "start":  [section_id] + remaining_ids,
+            "middle": remaining_ids[:mid_idx] + [section_id] + remaining_ids[mid_idx:],
+            "end":    remaining_ids + [section_id],
+        }
+
+        for pos_name, ordering in positions.items():
+            queries = (
+                payload.evaluation_queries[:num_queries]
+                if num_queries
+                else payload.evaluation_queries
+            )
+            pos_scores: dict[str, dict[int, ScoringResult]] = {}
+
+            for tier in tiers:
+                pos_scores[tier] = {}
+                for q_idx, eval_query in enumerate(queries):
+                    try:
+                        api_params = assemble_api_call(
+                            payload.sections,
+                            eval_query.query,
+                            ordering=ordering,
+                        )
+                        response_text, _, _usage = client.invoke(
+                            system=api_params["system"],
+                            messages=api_params["messages"],
+                            reasoning_tier=tier,
+                            max_tokens=_RESPONSE_MAX_TOKENS,
+                        )
+                        score_result, _score_usage = score_response(
+                            client=client,
+                            query=eval_query.query,
+                            response_text=response_text,
+                            reference_answer=eval_query.reference_answer,
+                            criteria=payload.quality_criteria,
+                        )
+                        pos_scores[tier][q_idx] = score_result
+                        logger.info(
+                            "Ordering [section=%s, pos=%s, tier=%s, q=%d] avg=%.2f",
+                            section_id, pos_name, tier, q_idx, score_result.avg_score(),
+                        )
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning(
+                            "Ordering experiment failed [section=%s, pos=%s, tier=%s, q=%d]: %s",
+                            section_id, pos_name, tier, q_idx, exc,
+                        )
+
+            pos_quality = _compute_avg(pos_scores)
+            # Delta: positive = this position is better than baseline.
+            position_deltas[pos_name] = pos_quality - baseline_quality
+
+        best_position = max(position_deltas, key=lambda p: position_deltas[p])
+        delta_values  = list(position_deltas.values())
+        quality_gain  = max(delta_values) - min(delta_values) if delta_values else 0.0
+
+        results.append({
+            "section_id":     section_id,
+            "label":          cand.label,
+            "best_position":  best_position,
+            "quality_deltas": position_deltas,
+            "quality_gain":   quality_gain,
+        })
+
+        _send_progress(
+            progress_queue,
+            {
+                "type":          "ordering_progress",
+                "section_id":    section_id,
+                "completed":     cand_idx + 1,
+                "total":         len(candidates),
+                "best_position": best_position,
+                "quality_gain":  quality_gain,
+            },
+        )
+        logger.info(
+            "Ordering complete [section=%s]: best=%s, gain=%.3f",
+            section_id, best_position, quality_gain,
+        )
+
+    _send_progress(progress_queue, {"type": "ordering_complete", "results": len(results)})
+    return results
 
 
 # ── Phase 4: greedy backward elimination ─────────────────────────────────────

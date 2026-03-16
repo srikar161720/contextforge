@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ContextForge — Ablation Report</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <style>
+    /* ── Reset & Base ────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                   "Helvetica Neue", Arial, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      line-height: 1.6;
+    }
+
+    /* ── Layout ──────────────────────────────────────────────────────────── */
+    .page-wrapper {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    /* ── Header ──────────────────────────────────────────────────────────── */
+    .report-header {
+      border-bottom: 2px solid #4a5568;
+      padding-bottom: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .report-header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #f7fafc;
+      letter-spacing: -0.5px;
+    }
+    .report-header .subtitle {
+      color: #a0aec0;
+      font-size: 0.9rem;
+      margin-top: 0.25rem;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-left: 0.5rem;
+      vertical-align: middle;
+    }
+    .badge-demo  { background: #2d3748; color: #63b3ed; border: 1px solid #4299e1; }
+    .badge-quick { background: #2d3748; color: #68d391; border: 1px solid #48bb78; }
+    .badge-full  { background: #2d3748; color: #f6ad55; border: 1px solid #ed8936; }
+
+    /* ── Section headings ────────────────────────────────────────────────── */
+    .section {
+      margin-bottom: 3rem;
+    }
+    .section-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #90cdf4;
+      border-left: 4px solid #4299e1;
+      padding-left: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    /* ── Summary cards ───────────────────────────────────────────────────── */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .summary-card {
+      background: #1a202c;
+      border: 1px solid #2d3748;
+      border-radius: 0.5rem;
+      padding: 1rem 1.25rem;
+    }
+    .summary-card .card-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #718096;
+      margin-bottom: 0.3rem;
+    }
+    .summary-card .card-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #f7fafc;
+    }
+    .summary-card .card-sub {
+      font-size: 0.8rem;
+      color: #a0aec0;
+      margin-top: 0.15rem;
+    }
+    .card-positive { border-top: 3px solid #48bb78; }
+    .card-neutral  { border-top: 3px solid #4299e1; }
+    .card-warning  { border-top: 3px solid #ed8936; }
+
+    /* ── Chart containers ────────────────────────────────────────────────── */
+    .chart-container {
+      background: #1a202c;
+      border: 1px solid #2d3748;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+      overflow: hidden;
+    }
+    .chart-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      margin-bottom: 0.75rem;
+    }
+    .chart-description {
+      font-size: 0.8rem;
+      color: #718096;
+      margin-bottom: 0.75rem;
+    }
+
+    /* ── Tables ──────────────────────────────────────────────────────────── */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    .data-table th {
+      background: #2d3748;
+      color: #a0aec0;
+      font-weight: 600;
+      text-align: left;
+      padding: 0.6rem 0.75rem;
+      border-bottom: 2px solid #4a5568;
+      white-space: nowrap;
+    }
+    .data-table td {
+      padding: 0.55rem 0.75rem;
+      border-bottom: 1px solid #2d3748;
+      color: #e2e8f0;
+    }
+    .data-table tr:hover td { background: #1e2535; }
+    .classification-essential { color: #f6ad55; font-weight: 600; }
+    .classification-moderate  { color: #63b3ed; font-weight: 600; }
+    .classification-removable { color: #68d391; font-weight: 600; }
+    .classification-harmful   { color: #fc8181; font-weight: 600; }
+
+    /* ── Diet plan markdown ───────────────────────────────────────────────── */
+    .diet-plan-content {
+      background: #1a202c;
+      border: 1px solid #2d3748;
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      line-height: 1.8;
+    }
+    .diet-plan-content h1,
+    .diet-plan-content h2,
+    .diet-plan-content h3 {
+      color: #90cdf4;
+      margin: 1.25rem 0 0.5rem;
+    }
+    .diet-plan-content h1 { font-size: 1.3rem; }
+    .diet-plan-content h2 { font-size: 1.1rem; border-bottom: 1px solid #2d3748; padding-bottom: 0.35rem; }
+    .diet-plan-content h3 { font-size: 1rem; }
+    .diet-plan-content p  { margin: 0.6rem 0; color: #cbd5e0; }
+    .diet-plan-content ul,
+    .diet-plan-content ol { margin: 0.5rem 0 0.5rem 1.5rem; }
+    .diet-plan-content li { margin: 0.3rem 0; color: #cbd5e0; }
+    .diet-plan-content strong { color: #f7fafc; }
+    .diet-plan-content code {
+      background: #2d3748;
+      padding: 0.1rem 0.35rem;
+      border-radius: 0.25rem;
+      font-size: 0.85em;
+      color: #f6ad55;
+    }
+    .diet-plan-content pre {
+      background: #2d3748;
+      padding: 1rem;
+      border-radius: 0.4rem;
+      overflow-x: auto;
+      margin: 0.75rem 0;
+    }
+    .diet-plan-content blockquote {
+      border-left: 3px solid #4299e1;
+      padding-left: 1rem;
+      color: #a0aec0;
+      margin: 0.75rem 0;
+    }
+
+    /* ── CI narrative ─────────────────────────────────────────────────────── */
+    .ci-narrative {
+      background: #1a202c;
+      border: 1px solid #2d3748;
+      border-left: 4px solid #9f7aea;
+      border-radius: 0.5rem;
+      padding: 1.25rem 1.5rem;
+    }
+    .ci-narrative p { color: #cbd5e0; margin: 0.5rem 0; }
+    .ci-badge {
+      display: inline-block;
+      background: #44337a;
+      color: #d6bcfa;
+      border: 1px solid #6b46c1;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 0.15rem 0.5rem;
+      border-radius: 9999px;
+      margin-bottom: 0.75rem;
+    }
+
+    /* ── Redundancy clusters ─────────────────────────────────────────────── */
+    .cluster-list {
+      list-style: none;
+      padding: 0;
+    }
+    .cluster-item {
+      background: #1a202c;
+      border: 1px solid #2d3748;
+      border-radius: 0.4rem;
+      padding: 0.6rem 1rem;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.85rem;
+    }
+    .cluster-badge {
+      background: #744210;
+      color: #fbd38d;
+      border: 1px solid #975a16;
+      padding: 0.15rem 0.45rem;
+      border-radius: 9999px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    /* ── Ordering table ──────────────────────────────────────────────────── */
+    .ordering-empty {
+      color: #718096;
+      font-style: italic;
+      padding: 1rem;
+    }
+
+    /* ── Usage footer ────────────────────────────────────────────────────── */
+    .usage-footer {
+      background: #1a202c;
+      border: 1px solid #2d3748;
+      border-radius: 0.5rem;
+      padding: 1rem 1.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+      font-size: 0.85rem;
+    }
+    .usage-item .usage-label { color: #718096; margin-bottom: 0.15rem; }
+    .usage-item .usage-value { color: #e2e8f0; font-weight: 600; }
+
+    /* ── Divider ─────────────────────────────────────────────────────────── */
+    .divider {
+      border: none;
+      border-top: 1px solid #2d3748;
+      margin: 2rem 0;
+    }
+  </style>
+</head>
+<body>
+<div class="page-wrapper">
+
+  <!-- ── Header ──────────────────────────────────────────────────────────── -->
+  <header class="report-header">
+    <h1>
+      ContextForge — Ablation Report
+      <span class="badge badge-{{ experiment_mode }}">{{ experiment_mode|upper }}</span>
+    </h1>
+    <p class="subtitle">
+      Generated {{ generated_at }} &nbsp;·&nbsp;
+      Payload: <strong>{{ payload_name }}</strong>
+    </p>
+  </header>
+
+  <!-- ── Executive Summary Cards ─────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Executive Summary</h2>
+    <div class="summary-grid">
+      <div class="summary-card card-neutral">
+        <div class="card-label">Baseline Tokens</div>
+        <div class="card-value">{{ "{:,}".format(total_tokens) }}</div>
+        <div class="card-sub">${{ "%.4f"|format(baseline_cost_per_call) }}/call</div>
+      </div>
+      <div class="summary-card card-positive">
+        <div class="card-label">Lean Tokens</div>
+        <div class="card-value">{{ "{:,}".format(lean_tokens) }}</div>
+        <div class="card-sub">${{ "%.4f"|format(lean_cost_per_call) }}/call</div>
+      </div>
+      <div class="summary-card card-positive">
+        <div class="card-label">Token Reduction</div>
+        <div class="card-value">{{ "%.1f"|format(lean_token_reduction * 100) }}%</div>
+        <div class="card-sub">{{ "{:,}".format(total_tokens - lean_tokens) }} tokens saved</div>
+      </div>
+      <div class="summary-card card-positive">
+        <div class="card-label">Quality Retention</div>
+        <div class="card-value">{{ "%.1f"|format(lean_quality_retention * 100) }}%</div>
+        <div class="card-sub">of baseline quality preserved</div>
+      </div>
+      <div class="summary-card card-warning">
+        <div class="card-label">Sections Tested</div>
+        <div class="card-value">{{ section_count }}</div>
+        <div class="card-sub">{{ removable_count }} removable · {{ essential_count }} essential</div>
+      </div>
+      <div class="summary-card card-neutral">
+        <div class="card-label">Total API Cost</div>
+        <div class="card-value">${{ "%.2f"|format(total_cost) }}</div>
+        <div class="card-sub">{{ "{:,}".format(total_api_calls) }} Bedrock calls</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Quality Heatmap ──────────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Section × Tier Quality Heatmap</h2>
+    <div class="chart-container">
+      <p class="chart-description">
+        Quality delta when each section is removed, across reasoning tiers.
+        Red = section hurts quality when removed; blue = section helps quality when removed.
+      </p>
+      {{ heatmap_html }}
+    </div>
+  </section>
+
+  <!-- ── Section Impact Waterfall ─────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Section Impact Ranking</h2>
+    <div class="chart-container">
+      <p class="chart-description">
+        Average quality delta per section, sorted highest to lowest.
+        Sections with positive delta help quality; those near zero are safe to remove.
+      </p>
+      {{ impact_chart_html }}
+    </div>
+  </section>
+
+  <!-- ── Pareto Frontier ──────────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Pareto Frontier: Quality vs. Token Count</h2>
+    <div class="chart-container">
+      <p class="chart-description">
+        Non-dominated configurations on the quality vs. token-count tradeoff.
+        Points on the frontier offer the best quality for a given token budget.
+      </p>
+      {{ pareto_chart_html }}
+    </div>
+  </section>
+
+  <!-- ── Tier Sensitivity Radar ────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Reasoning Tier Sensitivity</h2>
+    <div class="chart-container">
+      <p class="chart-description">
+        Tier sensitivity score per section (variance of quality delta across tiers).
+        High variance means the section's importance depends on reasoning depth.
+      </p>
+      {{ tier_radar_html }}
+    </div>
+  </section>
+
+  <!-- ── Section Details Table ─────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Section Details</h2>
+    <div class="chart-container" style="overflow-x: auto;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Section</th>
+            <th>Type</th>
+            <th>Tokens</th>
+            <th>Avg Δ</th>
+            <th>Tier Sensitivity</th>
+            <th>Quality/Token</th>
+            <th>Classification</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for imp in section_impacts %}
+          <tr>
+            <td>{{ imp.label }}</td>
+            <td>{{ imp.section_type }}</td>
+            <td>{{ "{:,}".format(imp.token_count) }}</td>
+            <td>{{ "%+.2f"|format(imp.avg_quality_delta) }}</td>
+            <td>{{ "%.3f"|format(imp.tier_sensitivity) }}</td>
+            <td>{{ "%.5f"|format(imp.quality_per_token) }}</td>
+            <td class="classification-{{ imp.classification }}">{{ imp.classification }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Redundancy Clusters ────────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Redundancy Clusters</h2>
+    {% if redundancy_clusters %}
+    <ul class="cluster-list">
+      {% for id1, id2, sim in redundancy_clusters %}
+      <li class="cluster-item">
+        <span class="cluster-badge">{{ "%.2f"|format(sim) }}</span>
+        <span>{{ id1 }} ↔ {{ id2 }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p style="color: #718096; font-style: italic;">
+      No redundancy clusters detected above the configured threshold.
+    </p>
+    {% endif %}
+  </section>
+
+  <!-- ── Ordering Findings ──────────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Ordering Experiment Findings</h2>
+    {% if ordering_recommendations %}
+    <div class="chart-container" style="overflow-x: auto;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Section</th>
+            <th>Best Position</th>
+            <th>Δ Start</th>
+            <th>Δ Middle</th>
+            <th>Δ End</th>
+            <th>Quality Gain</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for rec in ordering_recommendations %}
+          <tr>
+            <td>{{ rec.label }}</td>
+            <td><strong>{{ rec.best_position }}</strong></td>
+            <td>{{ "%+.2f"|format(rec.quality_deltas.get("start", 0.0)) }}</td>
+            <td>{{ "%+.2f"|format(rec.quality_deltas.get("middle", 0.0)) }}</td>
+            <td>{{ "%+.2f"|format(rec.quality_deltas.get("end", 0.0)) }}</td>
+            <td>{{ "%.2f"|format(rec.quality_gain) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="ordering-empty">
+      Ordering experiments were not run for this mode (Full mode only).
+    </p>
+    {% endif %}
+  </section>
+
+  <!-- ── Context Diet Plan ──────────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Context Diet Plan</h2>
+    <div class="diet-plan-content">
+      {{ diet_plan_html }}
+    </div>
+  </section>
+
+  <!-- ── Code Interpreter Narrative ────────────────────────────────────────── -->
+  {% if ci_narrative_html %}
+  <section class="section">
+    <h2 class="section-title">Nova Code Interpreter Analysis</h2>
+    <div class="ci-narrative">
+      <span class="ci-badge">Nova Code Interpreter</span>
+      {{ ci_narrative_html }}
+    </div>
+  </section>
+  {% endif %}
+
+  <hr class="divider" />
+
+  <!-- ── API Usage Footer ───────────────────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">API Usage Summary</h2>
+    <div class="usage-footer">
+      <div class="usage-item">
+        <div class="usage-label">Total API Calls</div>
+        <div class="usage-value">{{ "{:,}".format(total_api_calls) }}</div>
+      </div>
+      <div class="usage-item">
+        <div class="usage-label">Input Tokens</div>
+        <div class="usage-value">{{ "{:,}".format(total_input_tokens) }}</div>
+      </div>
+      <div class="usage-item">
+        <div class="usage-label">Output Tokens</div>
+        <div class="usage-value">{{ "{:,}".format(total_output_tokens) }}</div>
+      </div>
+      <div class="usage-item">
+        <div class="usage-label">Total Cost</div>
+        <div class="usage-value">${{ "%.4f"|format(total_cost) }}</div>
+      </div>
+      <div class="usage-item">
+        <div class="usage-label">Model</div>
+        <div class="usage-value">us.amazon.nova-2-lite-v1:0</div>
+      </div>
+    </div>
+  </section>
+
+</div><!-- /.page-wrapper -->
+</body>
+</html>
