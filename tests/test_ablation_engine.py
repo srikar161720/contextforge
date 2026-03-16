@@ -20,6 +20,7 @@ from core.ablation_engine import (
     run_baseline,
     run_full_sweep,
     run_greedy_elimination,
+    run_ordering_experiments,
     run_single_ablation,
 )
 from core.models import (
@@ -706,3 +707,247 @@ def test_full_sweep_demo_mode(bedrock_client):
     assert len(result.redundancy_clusters) > 0, (
         "Expected redundancy clusters in the FAQ sections"
     )
+
+
+# ── Phase 5: run_ordering_experiments unit tests ──────────────────────────────
+
+
+def _make_full_payload() -> ContextPayload:
+    """Payload with a system prompt + 6 non-system sections and 3 eval queries."""
+    sections = [
+        _make_section("sys_001", SectionType.SYSTEM_PROMPT, "System prompt."),
+        _make_section("rag_001", SectionType.RAG_DOCUMENT, "FAQ A."),
+        _make_section("rag_002", SectionType.RAG_DOCUMENT, "FAQ B."),
+        _make_section("rag_003", SectionType.RAG_DOCUMENT, "FAQ C."),
+        _make_section("rag_004", SectionType.RAG_DOCUMENT, "FAQ D."),
+        _make_section("rag_005", SectionType.RAG_DOCUMENT, "FAQ E."),
+        _make_section("rag_006", SectionType.RAG_DOCUMENT, "FAQ F."),
+    ]
+    return ContextPayload(
+        sections=sections,
+        evaluation_queries=[
+            EvalQuery(query="Q0"), EvalQuery(query="Q1"), EvalQuery(query="Q2"),
+        ],
+        quality_criteria=["relevance", "accuracy", "completeness", "groundedness"],
+        total_tokens=140,
+    )
+
+
+def _make_impacts_for_ordering() -> list[SectionImpact]:
+    """6 non-system impacts ranked by avg_quality_delta descending."""
+    return [
+        _make_section_impact("rag_001", avg_delta=3.0, token_count=20, classification="essential"),
+        _make_section_impact("rag_002", avg_delta=2.5, token_count=20, classification="essential"),
+        _make_section_impact("rag_003", avg_delta=2.0, token_count=20, classification="moderate"),
+        _make_section_impact("rag_004", avg_delta=1.5, token_count=20, classification="moderate"),
+        _make_section_impact("rag_005", avg_delta=0.3, token_count=20, classification="removable"),
+        _make_section_impact("rag_006", avg_delta=0.1, token_count=20, classification="removable"),
+    ]
+
+
+def _make_ordering_config() -> ExperimentConfig:
+    return ExperimentConfig(
+        mode=ExperimentMode.FULL,
+        quality_tolerance=0.05,
+        redundancy_threshold=0.7,
+        repetitions=1,
+        reasoning_tiers=["disabled"],
+    )
+
+
+def test_ordering_experiments_returns_correct_structure():
+    """run_ordering_experiments must return a list of dicts with required keys."""
+    payload = _make_full_payload()
+    impacts = _make_impacts_for_ordering()
+    config  = _make_ordering_config()
+    baseline_scores = {"disabled": {0: _scoring_result(7), 1: _scoring_result(7)}}
+
+    with patch("core.ablation_engine.score_response") as mock_score, \
+         patch("core.ablation_engine._get_mode_config", return_value={"num_queries": 2}):
+        mock_score.return_value = (
+            _scoring_result(7),
+            {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15},
+        )
+        client = MagicMock()
+        client.invoke.return_value = (
+            "Response.", False,
+            {"input_tokens": 100, "output_tokens": 50, "total_tokens": 150},
+        )
+
+        results = run_ordering_experiments(
+            client=client,
+            payload=payload,
+            impacts=impacts,
+            config=config,
+            baseline_scores=baseline_scores,
+            top_n=3,
+        )
+
+    assert isinstance(results, list)
+    assert len(results) == 3   # top_n=3
+    for rec in results:
+        assert "section_id" in rec
+        assert "label" in rec
+        assert "best_position" in rec
+        assert "quality_deltas" in rec
+        assert "quality_gain" in rec
+        assert set(rec["quality_deltas"].keys()) == {"start", "middle", "end"}
+        assert rec["best_position"] in {"start", "middle", "end"}
+
+
+def test_ordering_experiments_selects_top_n():
+    """Only the top top_n non-system sections should be tested."""
+    payload = _make_full_payload()
+    impacts = _make_impacts_for_ordering()
+    config  = _make_ordering_config()
+    baseline_scores = {"disabled": {0: _scoring_result(7)}}
+
+    with patch("core.ablation_engine.score_response") as mock_score, \
+         patch("core.ablation_engine._get_mode_config", return_value={"num_queries": 1}):
+        mock_score.return_value = (
+            _scoring_result(7),
+            {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15},
+        )
+        client = MagicMock()
+        client.invoke.return_value = (
+            "Response.", False,
+            {"input_tokens": 100, "output_tokens": 50, "total_tokens": 150},
+        )
+
+        results = run_ordering_experiments(
+            client=client,
+            payload=payload,
+            impacts=impacts,
+            config=config,
+            baseline_scores=baseline_scores,
+            top_n=2,
+        )
+
+    assert len(results) == 2
+    # The top 2 by avg_quality_delta should be rag_001 and rag_002
+    returned_ids = {r["section_id"] for r in results}
+    assert "rag_001" in returned_ids
+    assert "rag_002" in returned_ids
+    assert "rag_005" not in returned_ids
+    assert "rag_006" not in returned_ids
+
+
+def test_ordering_experiments_skips_system_prompt():
+    """System prompt sections must never appear in ordering candidates."""
+    # Put a system_prompt impact at the top of the list
+    sys_impact = SectionImpact(
+        section_id="sys_001",
+        label="sys_001",
+        section_type=SectionType.SYSTEM_PROMPT.value,
+        token_count=20,
+        avg_quality_delta=10.0,   # highest delta — would be #1 if not filtered
+        quality_delta_by_tier={"disabled": 10.0},
+        tier_sensitivity=0.0,
+        classification="essential",
+        quality_per_token=0.5,
+    )
+    impacts = [sys_impact] + _make_impacts_for_ordering()
+
+    payload = _make_full_payload()
+    config  = _make_ordering_config()
+    baseline_scores = {"disabled": {0: _scoring_result(7)}}
+
+    with patch("core.ablation_engine.score_response") as mock_score, \
+         patch("core.ablation_engine._get_mode_config", return_value={"num_queries": 1}):
+        mock_score.return_value = (
+            _scoring_result(7),
+            {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15},
+        )
+        client = MagicMock()
+        client.invoke.return_value = (
+            "Response.", False,
+            {"input_tokens": 100, "output_tokens": 50, "total_tokens": 150},
+        )
+
+        results = run_ordering_experiments(
+            client=client,
+            payload=payload,
+            impacts=impacts,
+            config=config,
+            baseline_scores=baseline_scores,
+            top_n=3,
+        )
+
+    returned_ids = {r["section_id"] for r in results}
+    assert "sys_001" not in returned_ids
+
+
+def test_ordering_best_position_is_highest_delta():
+    """best_position must correspond to the position with the highest quality delta."""
+    payload = _make_full_payload()
+    impacts = _make_impacts_for_ordering()
+    config  = _make_ordering_config()
+    baseline_scores = {"disabled": {0: _scoring_result(5)}}
+
+    # Return different scores per position to drive a deterministic best
+    call_scores = iter([8, 7, 6])  # start→8, middle→7, end→6
+
+    def _mock_score(*args, **kwargs):
+        s = next(call_scores, 7)
+        return (
+            _scoring_result(s),
+            {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15},
+        )
+
+    with patch("core.ablation_engine.score_response", side_effect=_mock_score), \
+         patch("core.ablation_engine._get_mode_config", return_value={"num_queries": 1}):
+        client = MagicMock()
+        client.invoke.return_value = (
+            "Response.", False,
+            {"input_tokens": 100, "output_tokens": 50, "total_tokens": 150},
+        )
+
+        results = run_ordering_experiments(
+            client=client,
+            payload=payload,
+            impacts=impacts,
+            config=config,
+            baseline_scores=baseline_scores,
+            top_n=1,
+        )
+
+    assert len(results) == 1
+    # start(8) > middle(7) > end(6) → best_position should be "start"
+    assert results[0]["best_position"] == "start"
+    assert results[0]["quality_deltas"]["start"] > results[0]["quality_deltas"]["middle"]
+    assert results[0]["quality_deltas"]["middle"] > results[0]["quality_deltas"]["end"]
+
+
+def test_full_sweep_with_ordering_populates_recommendations():
+    """When run_ordering=true in mode config, AblationResults.ordering_recommendations is populated."""
+    payload = _make_full_payload()
+    config  = _make_ordering_config()   # mode=full
+
+    with patch("core.ablation_engine.score_response") as mock_score, \
+         patch("core.ablation_engine._get_mode_config") as mock_mode_cfg:
+
+        # Return config that enables ordering
+        mock_mode_cfg.return_value = {
+            "num_queries": 2,
+            "run_multi_section": False,
+            "run_ordering": True,
+        }
+        mock_score.return_value = (
+            _scoring_result(7),
+            {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15},
+        )
+        client = _patched_sweep_client()
+        client.invoke.return_value = (
+            "Response.", False,
+            {"input_tokens": 100, "output_tokens": 50, "total_tokens": 150},
+        )
+
+        result = run_full_sweep(client, payload, config)
+
+    # When run_ordering=true, ordering_recommendations must be a list (may be empty
+    # only if no candidates found, but with 6 non-system sections it should be populated).
+    assert isinstance(result.ordering_recommendations, list)
+    assert len(result.ordering_recommendations) > 0
+    for rec in result.ordering_recommendations:
+        assert "section_id" in rec
+        assert "best_position" in rec
