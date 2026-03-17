@@ -102,49 +102,49 @@ Phase 4: Multi-Section Ablation
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                       CONTEXTFORGE                          │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │                 ORCHESTRATION LAYER                    │ │
-│  │ AblationEngine — main experiment loop & state machine  │ │
-│  │ Pydantic v2 state management — typed models            │ │
-│  │ Mode selection — Demo / Quick / Full                   │ │
-│  └────────────────────────────────────────────────────────┘ │
-│                             │                               │
-│                             ▼                               │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │           COGNITIVE CORE  (Nova 2 Lite)                │ │
-│  │                                                        │ │
-│  │  QualityScorer — LLM-as-judge scoring (MEDIUM tier)    │ │
-│  │  DietPlanner — optimization recommendations (HIGH)     │ │
-│  │  ReportGenerator — narrative HTML reports              │ │
-│  │  QueryGenerator — auto-generates eval queries          │ │
-│  │                                                        │ │
-│  │  Extended Thinking across 4 tiers measures how         │ │
-│  │  reasoning depth affects context sensitivity           │ │
-│  └────────────────────────────────────────────────────────┘ │
-│                             │                               │
-│                             ▼                               │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │                 EXECUTION LAYER                        │ │
-│  │  ContextParser — JSON → Pydantic ContextPayload        │ │
-│  │  Assembler — sections → Converse API parameters        │ │
-│  │  Analyzer — local stats (numpy/scipy/sklearn)          │ │
-│  │  RedundancyDetector — TF-IDF cosine similarity         │ │
-│  │  VisualizationGenerator — Plotly interactive charts    │ │
-│  └────────────────────────────────────────────────────────┘ │
-│                             │                               │
-│                             ▼                               │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │                  PERSISTENCE LAYER                     │ │
-│  │  Streamlit session state — experiment results cache    │ │
-│  │  JSON artifacts — diet plans, reports, cost logs       │ │
-│  │  HTML reports — self-contained downloadable files      │ │
-│  └────────────────────────────────────────────────────────┘ │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│                      CONTEXTFORGE                          │
+├────────────────────────────────────────────────────────────┤
+│                                                            │
+│ ┌────────────────────────────────────────────────────────┐ │
+│ │                 ORCHESTRATION LAYER                    │ │
+│ │ AblationEngine — main experiment loop & state machine  │ │
+│ │ Pydantic v2 state management — typed models            │ │
+│ │ Mode selection — Demo / Quick / Full                   │ │
+│ └────────────────────────────────────────────────────────┘ │
+│                            │                               │
+│                            ▼                               │
+│ ┌────────────────────────────────────────────────────────┐ │
+│ │           COGNITIVE CORE  (Nova 2 Lite)                │ │
+│ │                                                        │ │
+│ │  QualityScorer — LLM-as-judge scoring (MEDIUM tier)    │ │
+│ │  DietPlanner — optimization recommendations (HIGH)     │ │
+│ │  ReportGenerator — narrative HTML reports              │ │
+│ │  QueryGenerator — auto-generates eval queries          │ │
+│ │                                                        │ │
+│ │  Extended Thinking across 4 tiers measures how         │ │
+│ │  reasoning depth affects context sensitivity           │ │
+│ └────────────────────────────────────────────────────────┘ │
+│                            │                               │
+│                            ▼                               │
+│ ┌────────────────────────────────────────────────────────┐ │
+│ │                 EXECUTION LAYER                        │ │
+│ │  ContextParser — JSON → Pydantic ContextPayload        │ │
+│ │  Assembler — sections → Converse API parameters        │ │
+│ │  Analyzer — local stats (numpy/scipy/sklearn)          │ │
+│ │  RedundancyDetector — TF-IDF cosine similarity         │ │
+│ │  VisualizationGenerator — Plotly interactive charts    │ │
+│ └────────────────────────────────────────────────────────┘ │
+│                            │                               │
+│                            ▼                               │
+│ ┌────────────────────────────────────────────────────────┐ │
+│ │                  PERSISTENCE LAYER                     │ │
+│ │  Streamlit session state — experiment results cache    │ │
+│ │  JSON artifacts — diet plans, reports, cost logs       │ │
+│ │  HTML reports — self-contained downloadable files      │ │
+│ └────────────────────────────────────────────────────────┘ │
+│                                                            │
+└────────────────────────────────────────────────────────────┘
 ```
 
 ---
