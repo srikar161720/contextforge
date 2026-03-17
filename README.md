@@ -52,7 +52,7 @@ When you run an ablation experiment, ContextForge walks through each phase autom
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  CONTEXTFORGE — Ablation Experiment                         │
-│  Mode: Quick  |  Sections: 7  |  Queries: 5  |  Tiers: 3  │
+│  Mode: Quick  |  Sections: 7  |  Queries: 5  |  Tiers: 3    │
 └─────────────────────────────────────────────────────────────┘
 
 Phase 1: Parse & Segment
@@ -84,18 +84,18 @@ Phase 4: Multi-Section Ablation
 │ Lean Config:  89,022 tokens (was 212,438)                   │
 │ Quality:      97.2% retained                                │
 │ Cost Savings: $0.037 per call → $37 per 1K calls            │
-│ API Calls:    148  |  Experiment Cost: $0.07                 │
+│ API Calls:    148  |  Experiment Cost: $0.07                │
 │                                                             │
 │ Key Findings:                                               │
 │   - Product catalog (100K tokens) is 47% of payload but     │
 │     contributes only 0.12 quality points                    │
-│   - Conversation turns 1–35 are fully removable (Δ ≈ 0)    │
+│   - Conversation turns 1–35 are fully removable (Δ ≈ 0)     │
 │   - 18/20 tool definitions unused — safe to remove          │
 │   - FAQ has 40% internal redundancy (12 duplicate pairs)    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-> A working demo of the Streamlit app can be viewed at [YouTube Demo](https://www.youtube.com/watch?v=PLACEHOLDER).
+> A working demo of the Streamlit app can be viewed at [https://www.youtube.com/watch?v=VIx8RPkKspU](https://www.youtube.com/watch?v=VIx8RPkKspU)
 
 ---
 
@@ -108,32 +108,32 @@ Phase 4: Multi-Section Ablation
 │                                                             │
 │  ┌────────────────────────────────────────────────────────┐ │
 │  │                 ORCHESTRATION LAYER                    │ │
-│  │ AblationEngine — main experiment loop & state machine │ │
-│  │ Pydantic v2 state management — typed models           │ │
+│  │ AblationEngine — main experiment loop & state machine  │ │
+│  │ Pydantic v2 state management — typed models            │ │
 │  │ Mode selection — Demo / Quick / Full                   │ │
 │  └────────────────────────────────────────────────────────┘ │
 │                             │                               │
 │                             ▼                               │
 │  ┌────────────────────────────────────────────────────────┐ │
-│  │           COGNITIVE CORE  (Nova 2 Lite)               │ │
+│  │           COGNITIVE CORE  (Nova 2 Lite)                │ │
 │  │                                                        │ │
-│  │  QualityScorer — LLM-as-judge scoring (MEDIUM tier)   │ │
-│  │  DietPlanner — optimization recommendations (HIGH)    │ │
-│  │  ReportGenerator — narrative HTML reports             │ │
-│  │  QueryGenerator — auto-generates eval queries         │ │
+│  │  QualityScorer — LLM-as-judge scoring (MEDIUM tier)    │ │
+│  │  DietPlanner — optimization recommendations (HIGH)     │ │
+│  │  ReportGenerator — narrative HTML reports              │ │
+│  │  QueryGenerator — auto-generates eval queries          │ │
 │  │                                                        │ │
-│  │  Extended Thinking across 4 tiers measures how        │ │
-│  │  reasoning depth affects context sensitivity          │ │
+│  │  Extended Thinking across 4 tiers measures how         │ │
+│  │  reasoning depth affects context sensitivity           │ │
 │  └────────────────────────────────────────────────────────┘ │
 │                             │                               │
 │                             ▼                               │
 │  ┌────────────────────────────────────────────────────────┐ │
 │  │                 EXECUTION LAYER                        │ │
-│  │  ContextParser — JSON → Pydantic ContextPayload       │ │
-│  │  Assembler — sections → Converse API parameters       │ │
-│  │  Analyzer — local stats (numpy/scipy/sklearn)         │ │
-│  │  RedundancyDetector — TF-IDF cosine similarity        │ │
-│  │  VisualizationGenerator — Plotly interactive charts   │ │
+│  │  ContextParser — JSON → Pydantic ContextPayload        │ │
+│  │  Assembler — sections → Converse API parameters        │ │
+│  │  Analyzer — local stats (numpy/scipy/sklearn)          │ │
+│  │  RedundancyDetector — TF-IDF cosine similarity         │ │
+│  │  VisualizationGenerator — Plotly interactive charts    │ │
 │  └────────────────────────────────────────────────────────┘ │
 │                             │                               │
 │                             ▼                               │
@@ -265,49 +265,49 @@ python scripts/generate_demo_payload.py --offline
 Input: Context Payload (JSON) + Eval Queries + Mode Selection
                     │
                     ▼
-            ┌────────────────┐
-            │ PARSE & SEGMENT│  Validate JSON, count tokens, detect redundancy
-            └───────┬────────┘
+            ┌─────────────────┐
+            │ PARSE & SEGMENT │  Validate JSON, count tokens, detect redundancy
+            └───────┬─────────┘
                     │
                     ▼
-            ┌────────────────┐
-            │    BASELINE    │  Score responses on full context across all tiers
-            └───────┬────────┘
+            ┌─────────────────┐
+            │     BASELINE    │  Score responses on full context across all tiers
+            └───────┬─────────┘
                     │
                     ▼
     ┌────────────────────────────────────┐
-    │     SINGLE-SECTION ABLATION       │
+    │      SINGLE-SECTION ABLATION       │
     │                                    │
-    │  For each section:                │
-    │    1. Remove section from context │
-    │    2. Run all queries per tier    │
-    │    3. Score via LLM-as-judge      │
-    │    4. Compute quality delta       │
-    │    5. Classify impact             │
+    │  For each section:                 │
+    │    1. Remove section from context  │
+    │    2. Run all queries per tier     │
+    │    3. Score via LLM-as-judge       │
+    │    4. Compute quality delta        │
+    │    5. Classify impact              │
     │                                    │
-    │  Output: ranked section impacts   │
+    │  Output: ranked section impacts    │
     └───────────────┬────────────────────┘
                     │ (Quick + Full only)
                     ▼
     ┌────────────────────────────────────┐
-    │     MULTI-SECTION ABLATION        │
+    │      MULTI-SECTION ABLATION        │
     │                                    │
-    │  Greedy backward elimination:     │
-    │    1. Sort removable by tokens    │
-    │    2. Remove one, re-evaluate     │
-    │    3. Stop at quality tolerance   │
+    │  Greedy backward elimination:      │
+    │    1. Sort removable by tokens     │
+    │    2. Remove one, re-evaluate      │
+    │    3. Stop at quality tolerance    │
     │                                    │
-    │  Output: lean configuration       │
+    │  Output: lean configuration        │
     └───────────────┬────────────────────┘
                     │ (Full only)
                     ▼
     ┌────────────────────────────────────┐
-    │     ORDERING EXPERIMENTS          │
+    │       ORDERING EXPERIMENTS         │
     │                                    │
-    │  Top 5 sections × 3 positions:   │
-    │    start, middle, end             │
+    │  Top 5 sections × 3 positions:     │
+    │    start, middle, end              │
     │                                    │
-    │  Output: position recommendations │
+    │  Output: position recommendations  │
     └───────────────┬────────────────────┘
                     │
                     ▼
@@ -417,17 +417,17 @@ contextforge/
 │   ├── main.py                        # Streamlit entry point — landing hero + CTA
 │   ├── pages/
 │   │   ├── 1_upload.py                # Upload JSON, preview sections, mode selection
-│   │   ├── 2_progress.py             # Background thread + @st.fragment polling
-│   │   ├── 3_results.py              # Dashboard: 4 charts, detail table, redundancy
-│   │   ├── 4_diet_plan.py            # Diet plan generation + display (Nova HIGH)
-│   │   └── 5_report.py               # HTML report generation + download + preview
+│   │   ├── 2_progress.py              # Background thread + @st.fragment polling
+│   │   ├── 3_results.py               # Dashboard: 4 charts, detail table, redundancy
+│   │   ├── 4_diet_plan.py             # Diet plan generation + display (Nova HIGH)
+│   │   └── 5_report.py                # HTML report generation + download + preview
 │   └── components/
 │       ├── layout.py                  # Shared layout: global CSS theme + sidebar
 │       ├── context_viewer.py          # Section list with type/classification badges
 │       ├── heatmap.py                 # Section × tier quality delta heatmap
 │       ├── impact_chart.py            # Section impact horizontal bar chart
 │       ├── pareto_chart.py            # Pareto frontier scatter chart
-│       └── tier_radar.py             # Tier sensitivity radar chart
+│       └── tier_radar.py              # Tier sensitivity radar chart
 ├── core/
 │   ├── models.py                      # ALL Pydantic models — single source of truth
 │   ├── parser.py                      # Context payload parser & segmenter
@@ -437,12 +437,12 @@ contextforge/
 │   ├── analyzer.py                    # Local statistical analysis (numpy/scipy)
 │   ├── redundancy.py                  # TF-IDF redundancy detection
 │   ├── report_generator.py            # HTML report (Jinja2 + Plotly)
-│   └── diet_planner.py               # Context Diet Plan via Nova (HIGH tier)
+│   └── diet_planner.py                # Context Diet Plan via Nova (HIGH tier)
 ├── infra/
 │   ├── bedrock_client.py              # Converse API wrapper (rate limiting, retry)
 │   ├── rate_limiter.py                # Adaptive rate limiter (RPM + TPM)
 │   ├── json_parser.py                 # 4-strategy JSON parsing
-│   └── token_counter.py              # tiktoken pre-flight + API-reported actual
+│   └── token_counter.py               # tiktoken pre-flight + API-reported actual
 ├── data/
 │   ├── demo_payloads/                 # Pre-built demo payloads
 │   │   └── customer_support.json      # Primary demo (~212K tokens)
@@ -454,7 +454,7 @@ contextforge/
 ├── scripts/
 │   ├── generate_demo_payload.py       # Generate demo data (online or offline)
 │   ├── validate_demo.py               # Validate demo payload (26 checks)
-│   └── cost_tracker.py               # Check API spend from cost_log.json
+│   └── cost_tracker.py                # Check API spend from cost_log.json
 ├── context/                           # Detailed reference docs
 ├── config.yaml                        # Model, pricing, rate limits, thresholds
 ├── requirements.txt
